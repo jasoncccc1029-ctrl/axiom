@@ -1,0 +1,55 @@
+# Axiom / StudyOS — never commit secrets, caches, or runtime data
+
+# Secrets & local env
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env.local
+frontend/.env*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/coverage/
+npm-debug.log*
+yarn-error.log*
+
+# Runtime data
+*.db
+*.sqlite
+*.sqlite3
+database/
+backend/uploads/*
+!backend/uploads/.gitkeep
+!backend/uploads/vision/
+backend/uploads/vision/*
+!backend/uploads/vision/.gitkeep
+!backend/uploads/documents/
+backend/uploads/documents/*
+!backend/uploads/documents/.gitkeep
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+*.swp
+*~

@@ -1,0 +1,28 @@
+{
+  "analyze": {
+    "analysis": {
+      "content_type": "math_problem",
+      "subject": "mathematics",
+      "topic": "determinant",
+      "problem_text": "The image shows a math problem with a white background and black text. The problem is about finding the determinant of a 2x2 square. The text provides a step-by-step guide on how to find the determinant using the formula (a,b)(a,c)(b,c)a + (b,c)(b,a)(c,a)b. The image also includes a diagram of the square and the formula, as well as a list of the steps to find the determinant.",
+      "detected_formula": [],
+      "diagram_description": "Free-form vision caption (structured JSON unavailable).",
+      "confidence": 0.35,
+      "provider": "ollama",
+      "model": "moondream:latest"
+    },
+    "stored_filename": "ae27c26fdd0042fcb207a43d81488f18.png",
+    "mime_type": "image/png",
+    "size": 12693,
+    "timing": {
+      "response_time_ms": 3696.6,
+      "image_size_bytes": 12693,
+      "total_duration_ns": 3471039500,
+      "load_duration_ns": 2352200,
+      "prompt_eval_duration_ns": 696268000,
+      "eval_duration_ns": 2764329000
+    }
+  },
+  "wall_ms": 3727.7,
+  "is_mock": false
+}
