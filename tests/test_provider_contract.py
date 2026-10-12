@@ -88,13 +88,34 @@ def test_factory_default_is_ollama(monkeypatch):
     assert provider.provider_id == ProviderId.OLLAMA
 
 
-def test_factory_openai_not_configured_yet(monkeypatch):
+@pytest.mark.asyncio
+async def test_factory_openai_missing_key_lazy(monkeypatch):
+    """Phase 4.1: factory boots OpenAI without key; generate raises."""
+
     from app import config as config_mod
+    from app.providers.openai import OpenAIProvider
 
     monkeypatch.setattr(config_mod.settings, "ai_provider", "openai")
+    monkeypatch.setattr(config_mod.settings, "openai_api_key", "")
+    monkeypatch.setattr(config_mod.settings, "openai_model", "gpt-4o-mini")
+    provider = get_provider()
+    assert isinstance(provider, OpenAIProvider)
     with pytest.raises(ProviderNotConfiguredError) as exc:
-        get_provider()
+        await provider.generate(GenerateRequest(message="hi", purpose="chat"))
     assert exc.value.provider == "openai"
+
+
+def test_factory_openai_returns_provider_when_configured(monkeypatch):
+    from app import config as config_mod
+    from app.providers.openai import OpenAIProvider
+
+    monkeypatch.setattr(config_mod.settings, "ai_provider", "openai")
+    monkeypatch.setattr(config_mod.settings, "openai_api_key", "sk-test")
+    monkeypatch.setattr(config_mod.settings, "openai_model", "gpt-4o-mini")
+    provider = get_provider()
+    assert isinstance(provider, OpenAIProvider)
+    assert provider.provider_id == ProviderId.OPENAI
+    assert provider.identity == "openai:gpt-4o-mini"
 
 
 def test_ollama_unavailable_is_provider_unavailable_subclass():

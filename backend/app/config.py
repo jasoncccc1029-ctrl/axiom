@@ -33,11 +33,29 @@ class Settings(BaseSettings):
     default_user_name: str = "Student"
     default_user_email: str = "student@axiom.local"
 
-    # Text ModelProvider (Brain). Phase 2: ollama live; openai/anthropic later.
+    # Text ModelProvider (Brain). ollama | openai | gemini; anthropic later.
     # See docs/AXIOM_PRODUCT_ARCHITECTURE.md — Model ≠ product; Axiom understands the learner.
-    ai_provider: str = "ollama"  # ollama | openai | anthropic | cloud(deprecated)
+    ai_provider: str = "ollama"  # ollama | openai | gemini | anthropic | cloud(deprecated)
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "llama3.2:latest"
+    # Local CPU-friendly caps (no GPU → long generations dominate latency)
+    ollama_num_ctx: int = 2048
+    ollama_num_predict_chat: int = 384
+    ollama_num_predict_solve: int = 640
+    ollama_temperature: float = 0.4
+    ollama_keep_alive: str = "30m"
+
+    # OpenAI Cloud Brain (Responses API). Key stays in backend env only.
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+    openai_base_url: str = "https://api.openai.com/v1"
+
+    # Google Gemini Cloud Brain (generateContent). Key stays in backend env only.
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    gemini_temperature: float = 0.4
+    gemini_max_output_tokens: int = 512
 
     # VisionProvider — v0.3 phase 1
     # Default mock until user confirms pulling a local VLM (recommended: moondream)

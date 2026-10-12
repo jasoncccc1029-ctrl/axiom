@@ -18,7 +18,9 @@ from app.providers.exceptions import (
     ProviderUnavailableError,
 )
 from app.providers.factory import get_provider
+from app.providers.gemini import GeminiProvider
 from app.providers.ollama import OllamaProvider
+from app.providers.openai import OpenAIProvider
 from app.providers.types import (
     GenerateRequest,
     GenerateResponse,
@@ -30,6 +32,8 @@ from app.providers.types import (
 __all__ = [
     "ModelProvider",
     "OllamaProvider",
+    "OpenAIProvider",
+    "GeminiProvider",
     "CloudProvider",
     "get_provider",
     "ProviderId",

@@ -1,5 +1,6 @@
 """Unit tests for OllamaProvider (Phase 3 reference adapter)."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -57,6 +58,11 @@ def test_ollama_from_settings(monkeypatch):
 async def test_ollama_provider_chat_success():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/api/chat"
+        body = json.loads(request.content.decode())
+        assert body["stream"] is False
+        assert body["keep_alive"] == "30m"
+        assert body["options"]["num_predict"] == 384
+        assert body["options"]["num_ctx"] == 2048
         return httpx.Response(
             200,
             json={"message": {"role": "assistant", "content": "矩陣是矩形數字陣列。"}},

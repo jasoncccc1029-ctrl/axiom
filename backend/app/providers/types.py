@@ -17,6 +17,7 @@ class ProviderId(StrEnum):
 
     OLLAMA = "ollama"
     OPENAI = "openai"
+    GEMINI = "gemini"
     ANTHROPIC = "anthropic"
 
 

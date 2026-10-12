@@ -77,8 +77,14 @@ def provide_agent_service(
     return AgentService(db, container.model_provider, tools)
 
 
-def provide_problem_solver(request: Request) -> ProblemSolverService:
-    return ProblemSolverService(get_container(request).model_provider)
+def provide_problem_solver(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> ProblemSolverService:
+    return ProblemSolverService(
+        get_container(request).model_provider,
+        db=db,
+    )
 
 
 def provide_memory_service(db: Session = Depends(get_db)) -> MemoryService:

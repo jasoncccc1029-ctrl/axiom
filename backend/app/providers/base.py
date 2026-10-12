@@ -73,13 +73,19 @@ class ModelProvider(ABC):
         )
         return result.content
 
-    async def solve(self, problem: str, subject: str | None = None) -> dict[str, Any]:
+    async def solve(
+        self,
+        problem: str,
+        subject: str | None = None,
+        context: str | None = None,
+    ) -> dict[str, Any]:
         """Solver helper — structured dict expected by ProblemSolverService."""
 
         result = await self.generate(
             GenerateRequest(
                 message=problem,
                 subject=subject,
+                context=context,
                 purpose="solve",
             )
         )

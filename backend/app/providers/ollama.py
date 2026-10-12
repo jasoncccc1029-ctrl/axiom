@@ -41,6 +41,7 @@ from app.providers.types import (
 _DEFAULT_TUTOR_SYSTEM = (
     "你是 Axiom AI Tutor，一位清楚、耐心的高中學習助教。"
     "用繁體中文回答，條理分明，適合學生閱讀。"
+    "回覆精簡：優先短段落與要點；非必要不重複、不灌水。"
 )
 
 
@@ -56,6 +57,11 @@ class OllamaProvider(ModelProvider):
         *,
         timeout: float = 120.0,
         client: httpx.AsyncClient | None = None,
+        num_ctx: int = 2048,
+        num_predict_chat: int = 384,
+        num_predict_solve: int = 640,
+        temperature: float = 0.4,
+        keep_alive: str = "30m",
     ) -> None:
         base = (base_url or "").strip().rstrip("/")
         model_id = (model or "").strip()
@@ -74,6 +80,11 @@ class OllamaProvider(ModelProvider):
         self.model = model_id
         self.timeout = timeout
         self._client = client
+        self.num_ctx = max(512, int(num_ctx))
+        self.num_predict_chat = max(64, int(num_predict_chat))
+        self.num_predict_solve = max(64, int(num_predict_solve))
+        self.temperature = float(temperature)
+        self.keep_alive = (keep_alive or "30m").strip() or "30m"
 
     @classmethod
     def from_settings(cls, client: httpx.AsyncClient | None = None) -> OllamaProvider:
@@ -86,6 +97,11 @@ class OllamaProvider(ModelProvider):
             model=settings.ollama_model,
             timeout=settings.model_timeout_seconds,
             client=client,
+            num_ctx=settings.ollama_num_ctx,
+            num_predict_chat=settings.ollama_num_predict_chat,
+            num_predict_solve=settings.ollama_num_predict_solve,
+            temperature=settings.ollama_temperature,
+            keep_alive=settings.ollama_keep_alive,
         )
 
     @property
@@ -127,11 +143,18 @@ class OllamaProvider(ModelProvider):
         )
         return result.content
 
-    async def solve(self, problem: str, subject: str | None = None) -> dict[str, Any]:
+    async def solve(
+        self,
+        problem: str,
+        subject: str | None = None,
+        context: str | None = None,
+    ) -> dict[str, Any]:
         """Compatibility helper for ProblemSolverService — delegates to ``generate``."""
 
         result = await self.generate(
-            GenerateRequest(message=problem, subject=subject, purpose="solve")
+            GenerateRequest(
+                message=problem, subject=subject, context=context, purpose="solve"
+            )
         )
         return self._shape_solve_dict(result.content, subject=subject)
 
@@ -151,6 +174,8 @@ class OllamaProvider(ModelProvider):
                 {"role": "user", "content": request.message},
             ],
             "stream": False,
+            "keep_alive": self.keep_alive,
+            "options": self._generation_options(purpose="chat"),
         }
         data = await self._post_json("/api/chat", payload)
         content = ""
@@ -167,16 +192,37 @@ class OllamaProvider(ModelProvider):
             f"題目：{request.message}\n"
             "請用繁體中文輸出：先理解題意、再推導、最後給出答案。"
         )
+        if request.context:
+            prompt = (
+                f"{prompt}\n\n"
+                "以下 learner context 僅供參考（不可信教材除外），"
+                "依學生弱點與錯因調整解說深度，仍須解出本題：\n"
+                f"{request.context}"
+            )
         payload = {
             "model": self.model,
             "prompt": prompt,
             "stream": False,
+            "keep_alive": self.keep_alive,
+            "options": self._generation_options(purpose="solve"),
         }
         data = await self._post_json("/api/generate", payload)
         text = str(data.get("response", "")).strip()
         if not text:
             raise OllamaRequestError("Ollama 解題回傳空內容，請稍後再試。")
         return text, {"endpoint": "/api/generate", "response": data}
+
+    def _generation_options(self, *, purpose: str) -> dict[str, Any]:
+        """CPU-friendly generation caps — shorter outputs finish much sooner."""
+
+        num_predict = (
+            self.num_predict_solve if purpose == "solve" else self.num_predict_chat
+        )
+        return {
+            "temperature": self.temperature,
+            "num_ctx": self.num_ctx,
+            "num_predict": num_predict,
+        }
 
     def _shape_solve_dict(self, text: str, *, subject: str | None) -> dict[str, Any]:
         """Preserve existing Solver-facing step shape (do not change Solver logic)."""

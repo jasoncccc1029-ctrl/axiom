@@ -24,8 +24,9 @@ class CloudProvider(ModelProvider):
         self._error = ProviderNotConfiguredError(
             "cloud",
             message=(
-                "通用 CloudProvider 已停用。請使用 Ollama，或等待 OpenAI / Anthropic "
-                "adapter（設定 backend environment API key）。"
+                "通用 CloudProvider 已停用。請使用 AI_PROVIDER=ollama、"
+                "AI_PROVIDER=openai（OPENAI_API_KEY），"
+                "或 AI_PROVIDER=gemini（GEMINI_API_KEY）。"
             ),
         )
 
@@ -35,5 +36,10 @@ class CloudProvider(ModelProvider):
     async def chat(self, message: str, context: str | None = None) -> str:
         raise self._error
 
-    async def solve(self, problem: str, subject: str | None = None) -> dict[str, Any]:
+    async def solve(
+        self,
+        problem: str,
+        subject: str | None = None,
+        context: str | None = None,
+    ) -> dict[str, Any]:
         raise self._error
