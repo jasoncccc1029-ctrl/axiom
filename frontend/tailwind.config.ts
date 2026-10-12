@@ -56,6 +56,10 @@ const config: Config = {
           "0%, 100%": { opacity: "0.55" },
           "50%": { opacity: "1" },
         },
+        typingDot: {
+          "0%, 60%, 100%": { opacity: "0.35", transform: "translateY(0)" },
+          "30%": { opacity: "1", transform: "translateY(-3px)" },
+        },
         shimmer: {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
@@ -65,6 +69,7 @@ const config: Config = {
         fadeUp: "fadeUp 0.45s ease-out both",
         fadeOut: "fadeOut 0.5s ease-in forwards",
         pulseSoft: "pulseSoft 1.6s ease-in-out infinite",
+        typingDot: "typingDot 1.05s ease-in-out infinite",
         shimmer: "shimmer 1.4s linear infinite",
       },
     },

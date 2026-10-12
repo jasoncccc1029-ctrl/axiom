@@ -65,7 +65,16 @@ export function LearningTraceView({ trace }: { trace: LearningTraceData }) {
     steps.push({ label: "掌握", value: `${before}% → ${after}%${d}` });
   }
   if (recommendation?.action) {
-    steps.push({ label: "下一步", value: recommendation.action });
+    const why =
+      typeof recommendation.why === "string" && recommendation.why.trim()
+        ? recommendation.why.trim()
+        : typeof recommendation.reason === "string"
+          ? recommendation.reason
+          : "";
+    steps.push({
+      label: "下一步",
+      value: why ? `${recommendation.action}（${why}）` : recommendation.action,
+    });
   }
 
   if (!steps.length && !showRaw) {

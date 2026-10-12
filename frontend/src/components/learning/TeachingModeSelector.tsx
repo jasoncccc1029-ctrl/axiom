@@ -3,14 +3,14 @@
 import type { TeachingMode } from "@/lib/api";
 
 const MODES: { value: TeachingMode; label: string }[] = [
-  { value: "hint", label: "Hint" },
-  { value: "socratic", label: "Socratic" },
-  { value: "tutor", label: "Tutor" },
-  { value: "step_by_step", label: "Steps" },
-  { value: "concept", label: "Concept" },
-  { value: "error_diagnosis", label: "Diagnose" },
-  { value: "direct_solve", label: "Solve" },
-  { value: "full_solution", label: "Full" },
+  { value: "hint", label: "提示" },
+  { value: "socratic", label: "蘇格拉底" },
+  { value: "tutor", label: "教學" },
+  { value: "step_by_step", label: "逐步" },
+  { value: "concept", label: "概念" },
+  { value: "error_diagnosis", label: "錯因" },
+  { value: "direct_solve", label: "直解" },
+  { value: "full_solution", label: "完整解" },
 ];
 
 export function TeachingModeSelector({

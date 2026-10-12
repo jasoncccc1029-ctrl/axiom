@@ -73,6 +73,23 @@ export type OllamaHealth = {
   message: string;
 };
 
+export type SystemComponentHealth = {
+  ok: boolean;
+  detail: string;
+  provider?: string | null;
+  model?: string | null;
+  reachable?: boolean | null;
+};
+
+export type SystemHealth = {
+  ok: boolean;
+  backend: SystemComponentHealth;
+  text_brain: SystemComponentHealth;
+  ollama: SystemComponentHealth;
+  vision: SystemComponentHealth;
+  version: string;
+};
+
 export class ApiError extends Error {
   status: number;
 
@@ -239,6 +256,23 @@ export type RecommendationsResponse = {
   recommendations: Recommendation[];
   enough_data: boolean;
   message: string | null;
+};
+
+export type ErrorTypeCount = {
+  error_type: string;
+  count: number;
+  evidence?: { detail?: string; topic?: string | null; concept?: string | null }[];
+};
+
+export type ErrorDNAProfile = {
+  user_id: number;
+  subject?: string | null;
+  topic?: string | null;
+  most_frequent_error_types: ErrorTypeCount[];
+  repeated_errors: Record<string, unknown>[];
+  recent_errors: Record<string, unknown>[];
+  evidence_count: number;
+  notes?: string;
 };
 
 export type LearningTrace = {
@@ -451,6 +485,9 @@ export type ProblemSolveResponse = {
   verification_status: "VERIFIED" | "PARTIALLY_VERIFIED" | "FAILED" | "NOT_VERIFIABLE";
   provider: string;
   model: string;
+  subject?: string | null;
+  topic?: string | null;
+  personalized?: boolean;
 };
 
 export function analyzeVisionImage(

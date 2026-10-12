@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState, ErrorState, LoadingBlock, UploadProgress } from "@/components/ui/States";
 import { useToast } from "@/components/ui/Toast";
@@ -12,7 +13,7 @@ import {
   type Material,
 } from "@/lib/api";
 
-const SUBJECTS = ["高二數學", "英文", "物理"];
+const BASE_SUBJECTS = ["高二數學", "英文", "物理", "程式"];
 
 export default function MaterialsPage() {
   const { push } = useToast();
@@ -21,11 +22,16 @@ export default function MaterialsPage() {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
-  const [subject, setSubject] = useState(SUBJECTS[0]);
+  const [subject, setSubject] = useState(BASE_SUBJECTS[0]);
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  const subjects = useMemo(() => {
+    const fromItems = items.map((item) => item.subject).filter(Boolean);
+    return Array.from(new Set([...BASE_SUBJECTS, ...fromItems]));
+  }, [items]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,6 +87,7 @@ export default function MaterialsPage() {
   }
 
   async function handleDelete(id: number) {
+    if (!window.confirm("確定刪除此教材？")) return;
     try {
       await apiDelete(`/api/materials/${id}`);
       await load();
@@ -109,13 +116,15 @@ export default function MaterialsPage() {
 
       {!loading && !error && items.length === 0 ? (
         <EmptyState
+          title="還沒有教材"
+          description="上傳 PDF 或筆記後，可在教學中依科目練習，並讓 Axiom 用教材內容輔助理解。"
           action={
             <button
               type="button"
               onClick={() => setOpen(true)}
               className="rounded-xl bg-ink-950 px-4 py-2.5 text-sm text-white"
             >
-              新增
+              新增教材
             </button>
           }
         />
@@ -145,17 +154,25 @@ export default function MaterialsPage() {
               ) : (
                 <div className="flex-1" />
               )}
-              <div className="mt-5 flex items-center justify-between border-t border-ink-100 pt-4">
+              <div className="mt-5 flex items-center justify-between gap-3 border-t border-ink-100 pt-4">
                 <span className="text-xs text-ink-400">
                   {new Date(item.created_at).toLocaleDateString()}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => void handleDelete(item.id)}
-                  className="text-sm text-red-600 transition hover:text-red-800"
-                >
-                  刪除
-                </button>
+                <div className="flex items-center gap-3">
+                  <Link
+                    href={`/tutor?subject=${encodeURIComponent(item.subject)}&material_id=${item.id}`}
+                    className="text-sm font-medium text-accent-700 hover:text-ink-950"
+                  >
+                    用此教材練習 →
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(item.id)}
+                    className="text-sm text-red-600 transition hover:text-red-800"
+                  >
+                    刪除
+                  </button>
+                </div>
               </div>
             </article>
           ))}
@@ -187,7 +204,7 @@ export default function MaterialsPage() {
                   onChange={(e) => setSubject(e.target.value)}
                   className="w-full rounded-xl border border-ink-200 bg-ink-50/40 px-3 py-2.5 outline-none ring-accent-400 focus:ring-2"
                 >
-                  {SUBJECTS.map((s) => (
+                  {subjects.map((s) => (
                     <option key={s} value={s}>
                       {s}
                     </option>

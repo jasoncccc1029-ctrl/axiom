@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ErrorState, LoadingBlock } from "@/components/ui/States";
+import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import {
   apiGet,
   type MemoryResponse,
@@ -89,16 +89,44 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          {recs.length ? (
-            <section className="panel p-6">
-              <h2 className="font-display text-xl text-ink-950">下一步</h2>
+          <section className="panel p-6">
+            <h2 className="font-display text-xl text-ink-950">下一步</h2>
+            <p className="mt-1 text-sm text-ink-500">
+              Axiom 依掌握度、錯因與連續錯誤決定建議——理解你，再決定怎麼教，不是隨機出題。
+            </p>
+            {recs[0]?.why || recs[0]?.reason ? (
+              <p className="mt-3 rounded-lg bg-ink-50 px-3 py-2 text-xs leading-relaxed text-ink-600">
+                <span className="font-medium text-ink-800">為什麼是這一步：</span>
+                {recs[0].why || recs[0].reason}
+              </p>
+            ) : null}
+            {recs.length ? (
               <div className="mt-5 grid gap-3 md:grid-cols-2">
                 {recs.map((item) => (
                   <RecommendationCard key={`${item.subject}-${item.topic}`} {...item} />
                 ))}
               </div>
-            </section>
-          ) : null}
+            ) : (
+              <div className="mt-5">
+                <EmptyState
+                  title="還沒有足夠資料做推薦"
+                  description={
+                    recommendations?.message ||
+                    data.data_message ||
+                    "先在教學中練習幾題，Axiom 就能依你的狀態建議下一步。"
+                  }
+                  action={
+                    <Link
+                      href="/tutor"
+                      className="rounded-xl bg-ink-950 px-4 py-2.5 text-sm text-white hover:bg-ink-800"
+                    >
+                      去教學
+                    </Link>
+                  }
+                />
+              </div>
+            )}
+          </section>
 
           <div className="grid gap-4 lg:grid-cols-2">
             {student?.mastery.length ? (
@@ -113,15 +141,33 @@ export default function DashboardPage() {
               <section className="panel p-6">
                 <h2 className="font-display text-xl text-ink-950">錯因</h2>
                 <ul className="mt-4 space-y-2">
-                  {mistakes.map((item) => (
-                    <li
-                      key={`${item.pattern}-${item.topic}`}
-                      className="rounded-xl bg-red-50/70 px-3 py-2 text-sm text-ink-700"
-                    >
-                      {item.pattern} · {item.count}
-                      {item.topic ? ` · ${item.topic}` : ""}
-                    </li>
-                  ))}
+                  {mistakes.map((item) => {
+                    const href =
+                      item.subject && item.topic
+                        ? `/tutor?subject=${encodeURIComponent(item.subject)}&topic=${encodeURIComponent(item.topic)}`
+                        : item.subject
+                          ? `/tutor?subject=${encodeURIComponent(item.subject)}`
+                          : null;
+                    return (
+                      <li
+                        key={`${item.pattern}-${item.topic}`}
+                        className="rounded-xl bg-red-50/70 px-3 py-2 text-sm text-ink-700"
+                      >
+                        <span>
+                          {item.pattern} · {item.count}
+                          {item.topic ? ` · ${item.topic}` : ""}
+                        </span>
+                        {href ? (
+                          <Link
+                            href={href}
+                            className="mt-1 block text-xs font-medium text-accent-700 hover:text-ink-950"
+                          >
+                            去練習 →
+                          </Link>
+                        ) : null}
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
             ) : null}

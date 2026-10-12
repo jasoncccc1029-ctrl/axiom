@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ErrorState } from "@/components/ui/States";
@@ -9,7 +9,11 @@ import type {
   EvaluationMetrics,
   EvaluationSession,
   LearningReport,
+  Material,
+  RecommendationsResponse,
 } from "@/lib/api";
+
+const SUBJECT_OPTIONS = ["高二數學", "英文", "物理", "程式"];
 
 type Phase = "setup" | "pretest" | "learning" | "posttest" | "results";
 
@@ -29,8 +33,8 @@ function MetricRow({ label, value }: { label: string; value: string }) {
 
 export default function EvaluationPage() {
   const [phase, setPhase] = useState<Phase>("setup");
-  const [subject, setSubject] = useState("mathematics");
-  const [topic, setTopic] = useState("logarithms");
+  const [subject, setSubject] = useState("高二數學");
+  const [topic, setTopic] = useState("");
   const [groupArm, setGroupArm] = useState<"axiom" | "control">("axiom");
   const [session, setSession] = useState<EvaluationSession | null>(null);
   const [metrics, setMetrics] = useState<EvaluationMetrics | null>(null);
@@ -42,6 +46,23 @@ export default function EvaluationPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    void (async () => {
+      try {
+        const [recs, materials] = await Promise.all([
+          apiGet<RecommendationsResponse>("/api/recommendations").catch(() => null),
+          apiGet<Material[]>("/api/materials").catch(() => []),
+        ]);
+        const top = recs?.recommendations?.[0];
+        if (top?.subject) setSubject(top.subject);
+        if (top?.topic) setTopic(top.topic);
+        else if (materials?.[0]?.subject) setSubject(materials[0].subject);
+      } catch {
+        /* keep defaults */
+      }
+    })();
+  }, []);
+
   const preScore = useMemo(
     () => (preTotal > 0 ? preCorrect / preTotal : 0),
     [preCorrect, preTotal]
@@ -52,12 +73,16 @@ export default function EvaluationPage() {
   );
 
   async function startEvaluation() {
+    if (!topic.trim()) {
+      setError("請填寫主題，試驗才能對齊掌握度。");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       const created = await apiPostJson<EvaluationSession>("/api/evaluation/start", {
         subject,
-        topic,
+        topic: topic.trim(),
         group_arm: groupArm,
       });
       setSession(created);
@@ -156,21 +181,26 @@ export default function EvaluationPage() {
         <section className="panel space-y-4 p-6">
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="text-sm">
-              <span className="sr-only">科目</span>
-              <input
+              <span className="mb-1 block text-xs text-ink-400">科目</span>
+              <select
                 className="w-full rounded-lg border border-ink-200 px-3 py-2"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                placeholder="科目"
-              />
+              >
+                {SUBJECT_OPTIONS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="text-sm">
-              <span className="sr-only">主題</span>
+              <span className="mb-1 block text-xs text-ink-400">主題</span>
               <input
                 className="w-full rounded-lg border border-ink-200 px-3 py-2"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                placeholder="主題"
+                placeholder="例如：對數、三角函數"
               />
             </label>
             <label className="text-sm">
@@ -244,18 +274,36 @@ export default function EvaluationPage() {
             >
               {session.learning_session_id ? `#${session.learning_session_id}` : "開始學習"}
             </button>
-            <Link href="/tutor" className="rounded-lg bg-ink-950 px-4 py-2 text-sm text-white">
+            <Link
+              href={`/tutor?subject=${encodeURIComponent(session.subject)}&topic=${encodeURIComponent(session.topic)}${
+                session.learning_session_id
+                  ? `&session_id=${session.learning_session_id}`
+                  : ""
+              }`}
+              className="rounded-lg bg-ink-950 px-4 py-2 text-sm text-white"
+            >
               教學
             </Link>
             <button
               type="button"
               disabled={busy}
-              onClick={() => setPhase("posttest")}
+              onClick={() => {
+                if (!session.learning_session_id) {
+                  setError("請先按「開始學習」，再進入後測。");
+                  return;
+                }
+                setPhase("posttest");
+              }}
               className="rounded-lg border border-ink-200 bg-white px-4 py-2 text-sm"
             >
               後測
             </button>
           </div>
+          {!session.learning_session_id ? (
+            <p className="text-xs text-amber-800">
+              請先「開始學習」再進教學／後測，試驗 session 才會與掌握度對齊。
+            </p>
+          ) : null}
         </section>
       ) : null}
 
