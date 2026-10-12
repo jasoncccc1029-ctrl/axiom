@@ -239,15 +239,22 @@
 
     <section id="timeline">
       <h2>開發時間線</h2>
-      <p>以下對應本 repo 真實迭代（見 <code>docs/CHANGELOG.md</code>、<code>docs/AUTONOMOUS_DEVELOPMENT_REPORT.md</code> 與 git history）。</p>
+      <p>
+        以下為<strong>實際開發過程</strong>時間線（對齊 <code>docs/CHANGELOG.md</code>、<code>docs/AUTONOMOUS_DEVELOPMENT_REPORT.md</code>）。
+        注意：本 remote 的 git history 曾壓縮——首筆 <code>8a0a0ce</code> 已含大量核心程式；OpenAI／Gemini／個人化等後續變更在 2026-10-12 以數筆 commit 推上。
+      </p>
       <div class="timeline">
         <article class="item">
-          <div class="when">2026-10 · Commit 8a0a0ce</div>
-          <h3>倉庫初始化</h3>
-          <p>建立私有 GitHub repo <code>jasoncccc1029-ctrl/axiom</code>，落地 Next.js 15 + FastAPI + SQLite 骨架，綁定 Automation Guardian 與可複製答案規則。</p>
+          <div class="when">2026-10-02 · Commit 8a0a0ce</div>
+          <h3>倉庫落地（非空骨架）</h3>
+          <p>
+            建立 GitHub repo <code>jasoncccc1029-ctrl/axiom</code>（初為 private，後為發佈 Pages 改 public）。
+            首筆 commit 已含 Next.js 15 + FastAPI + SQLite，以及 Agent / Learning Loop / Mastery / Error DNA / AQE 等核心；
+            當時 Brain 以本機 Ollama 為主（OpenAI adapter 尚未啟用）。
+          </p>
           <div class="meta">
-            <span class="chip">scaffold</span>
-            <span class="chip">private repo</span>
+            <span class="chip">full core in 8a0a0ce</span>
+            <span class="chip">later: public + Pages</span>
           </div>
         </article>
 
@@ -255,8 +262,9 @@
           <div class="when">Phase 3 → 4.1</div>
           <h3>Brain 抽象：Ollama → OpenAI Responses</h3>
           <p>
-            以 <code>ModelProvider</code> 統一 Brain 合約；本機 Ollama（<code>llama3.2</code>）為預設。
+            以 <code>ModelProvider</code> 統一 Brain 合約；本機 Ollama（<code>llama3.2:latest</code>）為預設。
             Phase 4 接入 OpenAI Responses API；Phase 4.1 延遲 key 檢查，讓缺 key 時應用仍可啟動，health 依 <code>AI_PROVIDER</code> 回報。
+            （此段與後續個人化／Gemini 等工作，在本 remote 上多於 2026-10-12 以後續 commit 落地；下方日期依開發紀錄／CHANGELOG。）
           </p>
           <div class="meta">
             <span class="chip">providers</span>
@@ -275,7 +283,7 @@
           <div class="meta">
             <span class="chip">ContextBuilder</span>
             <span class="chip">deep links</span>
-            <span class="chip ok">168 passed</span>
+            <span class="chip ok">168 passed, 4 skipped</span>
           </div>
         </article>
 
@@ -360,8 +368,8 @@
     <section id="verify">
       <h2>驗證紀錄（摘錄）</h2>
       <ul>
-        <li>2026-10-04 優化輪：pytest <strong>168</strong> passed · frontend build OK</li>
-        <li>2026-10-11 初衷優化：pytest <strong>180+</strong> → major pass 後 <strong>182</strong> passed, 4 skipped · frontend build OK</li>
+        <li>2026-10-04 優化輪：pytest <strong>168</strong> passed, 4 skipped · frontend build OK</li>
+        <li>2026-10-11 初衷優化：pytest <strong>182</strong> passed, 4 skipped · frontend build OK</li>
         <li>本機預設：App <code>http://localhost:3000</code> · API <code>http://127.0.0.1:8000</code></li>
       </ul>
     </section>

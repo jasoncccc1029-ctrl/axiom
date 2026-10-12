@@ -20,12 +20,12 @@ real development process and project history of Axiom.
 
 ## Timeline summary
 
-1. **Repo init** — Next.js + FastAPI scaffold, private GitHub remote  
+1. **Repo landing (`8a0a0ce`)** — full core (not empty scaffold); repo was private, later public for Pages  
 2. **Phase 3–4.1** — `ModelProvider` (Ollama → OpenAI), lazy key / health  
 3. **Personalization** — Context Policy, “why” UI, stop `general` pollution  
 4. **UX / closed loop** — outcomes, deep links, vision→solver, tutor layout  
 5. **Gemini + speed** — optional cloud Brain; Ollama generation caps  
 6. **Product-intent pass** — Solver context, honest agent consult, `text_brain`  
-7. **This Pages site** — public chronicle of the above
+7. **This Pages site** — public chronicle of the above  
 
-Git commit history on `master` is the machine-readable companion to this page.
+Note: timeline dates follow CHANGELOG / autonomous reports; remote git was compressed (large init + 2026-10-12 follow-up commits).
