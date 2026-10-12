@@ -50,6 +50,8 @@ backend/uploads/documents/*
 Thumbs.db
 .idea/
 .vscode/
+.cursor/
+.tmp-gh-auth/
 *.log
 *.swp
 *~

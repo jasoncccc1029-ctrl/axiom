@@ -99,8 +99,8 @@ will resolve per-user preference without touching the Learning Loop.
 
 1. ~~Architecture audit~~  
 2. ~~ModelProvider interface~~  
-3. ~~OllamaProvider refactor (reference Brain)~~ ← current  
-4. OpenAIProvider (Responses API)  
+3. ~~OllamaProvider refactor (reference Brain)~~  
+4. ~~OpenAIProvider (Responses API)~~ + ~~Phase 4.1 stabilization~~ ← current  
 5. AnthropicProvider  
 6. ModelRouter (user selection first)  
 7. StudentContext + Context Policy  
@@ -119,6 +119,18 @@ will resolve per-user preference without touching the Learning Loop.
 
 Flow: `chat`/`solve` → `generate()` → Ollama HTTP → `GenerateResponse`.  
 
+### Phase 4 OpenAI identity (canonical)
+
+| Field | Value | Use |
+|-------|--------|-----|
+| `name` / `provider_id` | `openai` | AgentTrace.provider, APIs |
+| `model` | e.g. `gpt-4o-mini` | config `OPENAI_MODEL` |
+| `identity` / `model_ref().key()` | `openai:gpt-4o-mini` | Stable cross-layer key |
+| `display_name` | `Axiom Cloud · OpenAI · gpt-4o-mini` | UI / human logs |
+
+Flow: `chat`/`solve` → `generate()` → `POST /v1/responses` → `GenerateResponse`.  
+Secrets: `OPENAI_API_KEY` in backend `.env` only. Default process Brain remains Ollama unless `AI_PROVIDER=openai`.
+
 
 ---
 
@@ -131,4 +143,4 @@ Flow: `chat`/`solve` → `generate()` → Ollama HTTP → `GenerateResponse`.
 | Error DNA | `application/error_dna.py` |
 | Next problem | `application/adaptive_question_engine.py` |
 | Agent | `agent/service.py` |
-| Thin context today | `agent/context.py` (to be extended in Phase 7–8) |
+| Context Policy (lean) | `agent/context.py` — injects capped Student Model / Learning State / Error DNA / Adaptive why (Phase 7-lite) |

@@ -1,10 +1,20 @@
-# Axiom v1.2 — Intelligent Adaptive Learning Agent
+# Axiom v1.3.2 — Personalized AI Learning Agent
 
-Axiom 不是 ChatGPT clone。它把文字、圖片與 PDF 轉成可確認的學習問題，
-選擇知識庫或受限工具，驗證結果，再依學生實際紀錄調整教學方式。
+**開發歷程（GitHub Pages）：**  
+https://jasoncccc1029-ctrl.github.io/axiom/
+
+Axiom **不是** ChatGPT clone，也不是「選 GPT／Claude 來聊天」。
+
+```text
+Axiom = Student Model + Memory + Context + Policy + Agent + Learning Loop
+Model  = Brain（可替換：Ollama / OpenAI / Gemini …）
+```
+
+核心價值：越用越懂學習者（掌握度、錯因、歷史），並用該理解決定 **如何** 用 AI 教學。
+文字／圖片／PDF → 可確認的學習問題 → 工具驗證 → 依真實紀錄調整（Observe → Understand → Adapt → Teach）。
 
 核心技術：Next.js 15、TypeScript、Tailwind CSS、FastAPI、Python 3.12、
-SQLite、SQLAlchemy、Ollama `llama3.2:latest` 與 `moondream:latest`。
+SQLite、SQLAlchemy；本機預設 Brain 為 Ollama `llama3.2:latest`，Vision 為 `moondream:latest`。
 
 ## Installation
 
