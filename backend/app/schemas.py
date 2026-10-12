@@ -23,6 +23,9 @@ class SystemComponentHealth(BaseModel):
 class SystemHealthResponse(BaseModel):
     ok: bool
     backend: SystemComponentHealth
+    #: Canonical text-Brain health (follows AI_PROVIDER).
+    text_brain: SystemComponentHealth
+    #: Historical alias of ``text_brain`` (kept for older clients / tests).
     ollama: SystemComponentHealth
     vision: SystemComponentHealth
     version: str

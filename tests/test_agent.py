@@ -13,8 +13,9 @@ sys.path.insert(0, str(BACKEND_ROOT))
 from app.agent.planner import Planner  # noqa: E402
 from app.agent.schemas import AgentRunRequest, TeachingMode  # noqa: E402
 from app.agent.service import AgentService  # noqa: E402
+from app.application.subject_aliases import normalize_learning_label  # noqa: E402
 from app.database import Base  # noqa: E402
-from app.models import User  # noqa: E402
+from app.models import Attempt, User  # noqa: E402
 from app.providers.base import ModelProvider  # noqa: E402
 from app.providers.types import GenerateRequest, GenerateResponse, ProviderId  # noqa: E402
 from app.tools.base import Tool, ToolResult  # noqa: E402
@@ -114,3 +115,30 @@ async def test_agent_without_tools_is_not_verifiable():
             AgentRunRequest(message="What is history?")
         )
         assert result.verification_status.value == "NOT_VERIFIABLE"
+
+
+def test_normalize_learning_label_treats_general_as_missing():
+    assert normalize_learning_label("general") is None
+    assert normalize_learning_label("GENERAL") is None
+    assert normalize_learning_label("分數") == "分數"
+    assert normalize_learning_label("  ") is None
+
+
+@pytest.mark.asyncio
+async def test_agent_general_topic_does_not_auto_record_attempt():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(User(id=1, name="Student", email="student3@example.local"))
+        db.commit()
+        result = await AgentService(db, FakeProvider(), ToolRouter()).run(
+            AgentRunRequest(
+                message="幫我複習",
+                subject="mathematics",
+                topic="general",
+                mode=TeachingMode.TUTOR,
+            )
+        )
+        assert result.trace_id
+        attempts = db.query(Attempt).count()
+        assert attempts == 0

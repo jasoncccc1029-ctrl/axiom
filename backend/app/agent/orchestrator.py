@@ -59,6 +59,7 @@ class AgentOrchestrator:
                 route="memory",
                 reason="Student asked about repeated mistakes or learning history.",
                 consult_memory=True,
+                consult_student_model=True,
             )
         if _is_status_query(text):
             return RouteDecision(
@@ -66,6 +67,7 @@ class AgentOrchestrator:
                 route="student_model",
                 reason="Student asked about mastery, weak topics, or progress.",
                 consult_student_model=True,
+                consult_memory=False,
             )
 
         python_needed = _looks_like_python(text, request.subject) and "python" in available
@@ -118,13 +120,23 @@ class AgentOrchestrator:
                     "defer Math/Python verification until Solve mode."
                 )
 
+        # Honest personalization: only load student model when we have a focus
+        # (subject+topic) or the learner is asking about status / memory.
+        has_focus = bool(
+            (request.subject or "").strip() and (request.topic or "").strip()
+        )
+        status_or_memory = intent in {Intent.STUDENT_STATUS, Intent.MEMORY} or (
+            request.mode == TeachingMode.ERROR_DIAGNOSIS
+        )
         return RouteDecision(
             intent=intent,
             route=route,
             tools=[name for name in tools if name in available],
             reason=reason,
-            consult_memory=request.mode == TeachingMode.ERROR_DIAGNOSIS,
-            consult_student_model=True,
+            consult_memory=(
+                request.mode == TeachingMode.ERROR_DIAGNOSIS or intent == Intent.MEMORY
+            ),
+            consult_student_model=has_focus or status_or_memory,
         )
 
 

@@ -77,6 +77,7 @@ from app.core.errors import AxiomError
 from app.knowledge.ingestion import DocumentIngestionService
 from app.models import AgentTrace, LearningRecord, Material, Question
 from app.providers import ModelProvider, ProviderError
+from app.providers.health import check_text_brain_health
 from app.schemas import (
     ChatRequest,
     ChatResponse,
@@ -113,7 +114,14 @@ def health() -> HealthResponse:
 
 @router.get("/api/system/health", response_model=SystemHealthResponse)
 async def api_system_health() -> SystemHealthResponse:
-    ollama = await check_ollama_health()
+    """System health: text Brain follows AI_PROVIDER; vision stays independent.
+
+    ``text_brain`` is canonical. ``ollama`` mirrors it for older clients.
+    Vision is checked separately (VisionProvider / Ollama VLM).
+    """
+
+    text_brain = await check_text_brain_health()
+
     vision_provider = settings.vision_provider
     if vision_provider == "mock":
         vision_ok = True
@@ -121,6 +129,7 @@ async def api_system_health() -> SystemHealthResponse:
         vision_model = "mock-vision"
         vision_msg = "Vision mock provider active"
     else:
+        # Vision pipeline still depends on Ollama VLM when not mock.
         vision = await check_ollama_health(model=settings.ollama_vision_model)
         vision_ok = vision.ok
         vision_reachable = vision.reachable
@@ -133,13 +142,6 @@ async def api_system_health() -> SystemHealthResponse:
         provider="fastapi",
         reachable=True,
     )
-    ollama_component = SystemComponentHealth(
-        ok=ollama.ok,
-        detail=ollama.message,
-        provider="ollama",
-        model=ollama.model,
-        reachable=ollama.reachable,
-    )
     vision_component = SystemComponentHealth(
         ok=vision_ok,
         detail=vision_msg,
@@ -147,10 +149,12 @@ async def api_system_health() -> SystemHealthResponse:
         model=vision_model,
         reachable=vision_reachable,
     )
+    text_ok = bool(text_brain.ok)
     return SystemHealthResponse(
-        ok=backend.ok and ollama_component.reachable and vision_component.reachable,
+        ok=backend.ok and text_ok and bool(vision_component.reachable),
         backend=backend,
-        ollama=ollama_component,
+        text_brain=text_brain,
+        ollama=text_brain,
         vision=vision_component,
         version=settings.app_version,
     )

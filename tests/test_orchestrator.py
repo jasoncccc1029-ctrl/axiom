@@ -70,6 +70,28 @@ def test_memory_query_calls_no_tools():
     assert decision.intent == Intent.MEMORY
     assert decision.tools == []
     assert decision.consult_memory is True
+    assert decision.consult_student_model is True
+
+
+def test_unfocused_tutor_does_not_force_student_model():
+    decision = AgentOrchestrator().decide(
+        AgentRunRequest(message="Hello, can you help?", mode=TeachingMode.TUTOR),
+        TOOLS,
+    )
+    assert decision.consult_student_model is False
+
+
+def test_focused_tutor_consults_student_model():
+    decision = AgentOrchestrator().decide(
+        AgentRunRequest(
+            message="Help with this topic",
+            mode=TeachingMode.TUTOR,
+            subject="高二數學",
+            topic="二次函數",
+        ),
+        TOOLS,
+    )
+    assert decision.consult_student_model is True
 
 
 def test_socratic_math_question_skips_solver_until_asked():

@@ -32,6 +32,7 @@ class AgentRunRequest(BaseModel):
     subject: str | None = Field(default=None, max_length=120)
     topic: str | None = Field(default=None, max_length=160)
     material_id: int | None = None
+    problem_id: int | None = None
     confirmed_problem: str | None = Field(default=None, max_length=20_000)
     input_type: Literal["text", "image", "pdf"] = "text"
     conversation_id: int | None = None

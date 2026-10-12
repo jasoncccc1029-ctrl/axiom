@@ -25,9 +25,14 @@ from app.agent.verifier import Verifier
 from app.application.adaptive import AdaptiveTutor
 from app.application.learning_loop import LearningLoopService, LearningOutcomeRequest
 from app.application.outcome_automation import decide_from_verification
+from app.application.student_learning_state import StudentLearningStateService
 from app.application.student_model import StudentModelService
+from app.application.subject_aliases import (
+    canonicalize_subject,
+    normalize_learning_label,
+)
 from app.config import settings
-from app.models import AgentTrace, Conversation, Message, Question, utcnow
+from app.models import AgentTrace, Conversation, Material, Message, Question, utcnow
 from app.providers.base import ModelProvider
 from app.tools.base import ToolResult
 from app.tools.router import ToolRouter
@@ -47,6 +52,7 @@ class AgentService:
         orchestrator: AgentOrchestrator | None = None,
         student_model: StudentModelService | None = None,
         learning_loop: LearningLoopService | None = None,
+        learning_state: StudentLearningStateService | None = None,
     ) -> None:
         self.db = db
         self.model_provider = model_provider
@@ -58,11 +64,31 @@ class AgentService:
         self.adaptive_tutor = adaptive_tutor or AdaptiveTutor(db)
         self.student_model = student_model or StudentModelService(db)
         self.learning_loop = learning_loop or LearningLoopService(db)
+        self.learning_state = learning_state or StudentLearningStateService(db)
 
     async def run(self, request: AgentRunRequest) -> AgentRunResponse:
         started = time.perf_counter()
         trace_id = uuid.uuid4().hex
         requested_mode = request.mode
+        # Avoid polluting mastery / learning-state with placeholder topics.
+        subject = canonicalize_subject(normalize_learning_label(request.subject))
+        topic = normalize_learning_label(request.topic)
+        # Resolve focus from material / lean learning state when chat omitted it.
+        if request.material_id and not subject:
+            material = self.db.get(Material, request.material_id)
+            if material is not None:
+                subject = canonicalize_subject(material.subject)
+        if subject and not topic:
+            lean = self.learning_state.get(subject=subject).model_dump()
+            topic = normalize_learning_label(
+                lean.get("current_topic")
+                or (
+                    (lean.get("recent_errors") or [{}])[0].get("topic")
+                    if lean.get("recent_errors")
+                    else None
+                )
+            )
+        request = request.model_copy(update={"subject": subject, "topic": topic})
 
         conversation = (
             self.db.get(Conversation, request.conversation_id)
@@ -161,28 +187,51 @@ class AgentService:
             )
             student_snapshot = None
             memory_snapshot = None
+            learning_state_snapshot = None
             if decision.consult_student_model:
                 student = self.student_model.student()
+                mastery_rows = [
+                    {
+                        "subject": item.subject,
+                        "topic": item.topic,
+                        "mastery": item.mastery,
+                        "consecutive_errors": item.consecutive_errors,
+                    }
+                    for item in student.mastery
+                    if not request.subject or item.subject == request.subject
+                ][:8]
                 student_snapshot = {
-                    "weak_concepts": student.weak_concepts,
-                    "strong_concepts": student.strong_concepts,
-                    "topic_state": student_state,
-                    "mastery": [
-                        {
-                            "subject": item.subject,
-                            "topic": item.topic,
-                            "mastery": item.mastery,
-                            "consecutive_errors": item.consecutive_errors,
-                        }
-                        for item in student.mastery[:12]
-                    ],
+                    "weak_concepts": student.weak_concepts[:6],
+                    "strong_concepts": student.strong_concepts[:4],
+                    "topic_state": student_state if request.topic else None,
+                    "mastery": mastery_rows,
                 }
+                # Lean StudentLearningState (+ Error DNA slice) for personalization
+                learning_state_snapshot = self.learning_state.get(
+                    subject=request.subject,
+                    topic=request.topic,
+                ).model_dump()
             if decision.consult_memory:
                 memory = self.student_model.memory()
+                mistakes = memory.repeated_mistakes[:8]
+                if request.subject:
+                    mistakes = [
+                        m
+                        for m in mistakes
+                        if not m.get("subject") or m.get("subject") == request.subject
+                    ][:8]
                 memory_snapshot = {
-                    "repeated_mistakes": memory.repeated_mistakes[:8],
+                    "repeated_mistakes": mistakes,
                     "last_mistake_pattern": student_state.get("last_mistake_pattern"),
                 }
+            # Always attach topic_state when we have subject/topic even if consult
+            # flags were off — cheap and already computed.
+            if student_snapshot is None and request.subject and request.topic:
+                student_snapshot = {"topic_state": student_state, "mastery": []}
+                learning_state_snapshot = self.learning_state.get(
+                    subject=request.subject,
+                    topic=request.topic,
+                ).model_dump()
             context = self.context_builder.build(
                 tool_outputs={name: result.output for name, result in tool_results.items()},
                 mode=adapted_mode.value,
@@ -194,6 +243,7 @@ class AgentService:
                 },
                 student_model=student_snapshot,
                 memory=memory_snapshot,
+                learning_state=learning_state_snapshot,
                 intent=f"{decision.intent.value} / {decision.route}: {decision.reason}",
             )
             answer = await self.model_provider.chat(
@@ -257,6 +307,7 @@ class AgentService:
                         session_id=session.id,
                         conversation_id=conversation.id,
                         question_id=question.id,
+                        problem_id=request.problem_id,
                         trace_id=trace_id,
                         verified=outcome_decision.status.value == "VERIFIED",
                         outcome_source="tool_verifier",
@@ -506,17 +557,18 @@ def _should_auto_record(
 
 
 def _mode_instruction(mode: TeachingMode, message: str) -> str:
+    brevity = "回覆控制在 120–220 字以內，除非學生明確要求詳解。"
     if mode == TeachingMode.HINT:
-        return f"只提供下一步提示，不要揭露最終答案。學生問題：{message}"
+        return f"只提供下一步提示，不要揭露最終答案。{brevity}學生問題：{message}"
     if mode in {TeachingMode.TUTOR, TeachingMode.SOCRATIC}:
-        return f"逐步引導學生思考，每次解釋一個關鍵概念。學生問題：{message}"
+        return f"逐步引導學生思考，每次只講一個關鍵點。{brevity}學生問題：{message}"
     if mode == TeachingMode.CONCEPT:
-        return f"先解釋適用概念、已知條件與目標，不直接解完整題目。學生問題：{message}"
+        return f"先解釋適用概念、已知條件與目標，不直接解完整題目。{brevity}學生問題：{message}"
     if mode == TeachingMode.ERROR_DIAGNOSIS:
-        return f"診斷學生可能的錯誤與 misconception，再提供修正提示。學生問題：{message}"
+        return f"診斷學生可能的錯誤與 misconception，再提供修正提示。{brevity}學生問題：{message}"
     if mode == TeachingMode.STEP_BY_STEP:
-        return f"提供逐步解釋，清楚標示每一步的理由。學生問題：{message}"
-    return f"提供完整且清楚的解題流程。學生問題：{message}"
+        return f"提供逐步解釋，清楚標示每一步理由；最多 4 步。{brevity}學生問題：{message}"
+    return f"提供清楚解題流程，重點優先。{brevity}學生問題：{message}"
 
 
 def _safe_tool_summary(name: str, result: ToolResult) -> str:
