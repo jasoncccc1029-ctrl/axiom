@@ -3,6 +3,9 @@
 **開發歷程（GitHub Pages）：**  
 https://jasoncccc1029-ctrl.github.io/axiom/
 
+**Phase-1 雲端上線（Railway + Vercel，不用自管 VPS）：**  
+見 [`docs/DEPLOY_PHASE1.md`](docs/DEPLOY_PHASE1.md)
+
 Axiom **不是** ChatGPT clone，也不是「選 GPT／Claude 來聊天」。
 
 ```text

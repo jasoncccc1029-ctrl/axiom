@@ -2,10 +2,21 @@
 
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+
+
+def normalize_database_url(url: str) -> str:
+    """Accept Railway/Heroku-style URLs and prefer psycopg (v3) driver."""
+    value = (url or "").strip()
+    if value.startswith("postgres://"):
+        value = "postgresql://" + value[len("postgres://") :]
+    if value.startswith("postgresql://") and "+" not in value.split("://", 1)[0]:
+        value = "postgresql+psycopg://" + value[len("postgresql://") :]
+    return value
 
 
 class Settings(BaseSettings):
@@ -28,10 +39,28 @@ class Settings(BaseSettings):
     vision_upload_dir: Path = Path(__file__).resolve().parent.parent / "uploads" / "vision"
     document_upload_dir: Path = Path(__file__).resolve().parent.parent / "uploads" / "documents"
 
-    # Local single-user mode
+    # Phase-1 deploy: comma-separated browser origins (plus localhost defaults in main.py)
+    cors_origins: str = ""
+    # Optional shared secret for early cloud demo (empty = disabled, local-friendly)
+    access_token: str = ""
+
+    # Local single-user mode (Phase-1: one logical student until real auth)
     default_user_id: int = 1
     default_user_name: str = "Student"
     default_user_email: str = "student@axiom.local"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _normalize_db_url(cls, value: object) -> object:
+        if value is None:
+            return value
+        if isinstance(value, str):
+            if not value.strip():
+                return (
+                    f"sqlite:///{Path(__file__).resolve().parent.parent.parent / 'database' / 'axiom.db'}"
+                )
+            return normalize_database_url(value)
+        return value
 
     # Text ModelProvider (Brain). ollama | openai | gemini; anthropic later.
     # See docs/AXIOM_PRODUCT_ARCHITECTURE.md — Model ≠ product; Axiom understands the learner.
@@ -90,4 +119,5 @@ settings = Settings()
 settings.upload_dir.mkdir(parents=True, exist_ok=True)
 settings.vision_upload_dir.mkdir(parents=True, exist_ok=True)
 settings.document_upload_dir.mkdir(parents=True, exist_ok=True)
-(Path(__file__).resolve().parent.parent.parent / "database").mkdir(parents=True, exist_ok=True)
+if settings.database_url.startswith("sqlite"):
+    (Path(__file__).resolve().parent.parent.parent / "database").mkdir(parents=True, exist_ok=True)

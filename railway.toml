@@ -1,0 +1,14 @@
+# Optional: if you deploy from repo root with Docker.
+# Easier path (recommended in docs/DEPLOY_PHASE1.md):
+#   Railway service Root Directory = backend
+#   Builder = Nixpacks / Railpack
+#   Start: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "backend/Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"

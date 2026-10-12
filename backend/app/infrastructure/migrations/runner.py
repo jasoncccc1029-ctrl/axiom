@@ -84,12 +84,25 @@ ALTER_COLUMNS: dict[str, dict[str, str]] = {
 }
 
 
+def _dialect_name(engine: Engine) -> str:
+    return engine.dialect.name
+
+
+def _column_ddl(ddl: str, dialect: str) -> str:
+    """Map SQLite-oriented DDL fragments to Postgres where needed."""
+    if dialect == "sqlite":
+        return ddl
+    return ddl.replace("DATETIME", "TIMESTAMP")
+
+
 def run_migrations(engine: Engine) -> None:
+    dialect = _dialect_name(engine)
+    ts_type = "DATETIME" if dialect == "sqlite" else "TIMESTAMP"
     with engine.begin() as connection:
         connection.execute(
             text(
                 "CREATE TABLE IF NOT EXISTS schema_migrations "
-                "(version VARCHAR(80) PRIMARY KEY, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+                f"(version VARCHAR(80) PRIMARY KEY, applied_at {ts_type} DEFAULT CURRENT_TIMESTAMP)"
             )
         )
         inspector = inspect(connection)
@@ -100,7 +113,8 @@ def run_migrations(engine: Engine) -> None:
             existing = {column["name"] for column in inspector.get_columns(table)}
             for name, ddl in columns.items():
                 if name not in existing:
-                    connection.execute(text(f'ALTER TABLE "{table}" ADD COLUMN "{name}" {ddl}'))
+                    col_ddl = _column_ddl(ddl, dialect)
+                    connection.execute(text(f'ALTER TABLE "{table}" ADD COLUMN "{name}" {col_ddl}'))
 
     # Creates new v1 tables and indexes, but never drops existing objects.
     Base.metadata.create_all(bind=engine)
@@ -108,10 +122,19 @@ def run_migrations(engine: Engine) -> None:
     with engine.begin() as connection:
         _copy_legacy_profile(connection)
         for version in MIGRATION_IDS:
-            connection.execute(
-                text("INSERT OR IGNORE INTO schema_migrations(version) VALUES (:version)"),
-                {"version": version},
-            )
+            if dialect == "sqlite":
+                connection.execute(
+                    text("INSERT OR IGNORE INTO schema_migrations(version) VALUES (:version)"),
+                    {"version": version},
+                )
+            else:
+                connection.execute(
+                    text(
+                        "INSERT INTO schema_migrations(version) VALUES (:version) "
+                        "ON CONFLICT (version) DO NOTHING"
+                    ),
+                    {"version": version},
+                )
 
 
 def _copy_legacy_profile(connection) -> None:  # type: ignore[no-untyped-def]

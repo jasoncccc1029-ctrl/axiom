@@ -11,8 +11,27 @@ from app.core.errors import AxiomError
 from app.providers import ProviderError
 from app.vision import VisionError
 from app.dependencies import AppContainer
+from app.middleware_access import AccessTokenMiddleware
 from app.routers import router
 from app.services.seed import init_db
+
+
+def _cors_origins() -> list[str]:
+    defaults = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ]
+    extra = [o.strip() for o in (settings.cors_origins or "").split(",") if o.strip()]
+    # Preserve order, drop dupes
+    seen: set[str] = set()
+    out: list[str] = []
+    for origin in defaults + extra:
+        if origin not in seen:
+            seen.add(origin)
+            out.append(origin)
+    return out
 
 
 @asynccontextmanager
@@ -46,17 +65,14 @@ async def handle_vision_error(_: Request, exc: VisionError) -> JSONResponse:
     status = 400 if exc.code == "invalid_image" else 503
     return JSONResponse(status_code=status, content={"detail": exc.message, "code": exc.code})
 
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-    ],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(AccessTokenMiddleware)
 
 app.include_router(router)

@@ -1,5 +1,20 @@
-/** Same-origin base. Next.js rewrites `/api/*` → FastAPI `127.0.0.1:8000`. */
+/**
+ * Same-origin base by default. Next.js rewrites `/api/*` → backend
+ * (`API_PROXY_TARGET`, default 127.0.0.1:8000). For a direct cloud API,
+ * set `NEXT_PUBLIC_API_BASE` (and CORS_ORIGINS on the backend).
+ */
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
+
+function accessHeaders(extra?: HeadersInit): HeadersInit {
+  const token =
+    process.env.NEXT_PUBLIC_AXIOM_ACCESS_TOKEN ||
+    (typeof window !== "undefined"
+      ? window.localStorage.getItem("axiom_access_token") || ""
+      : "");
+  const headers = new Headers(extra);
+  if (token) headers.set("X-Axiom-Token", token);
+  return headers;
+}
 
 
 export type Material = {
@@ -110,20 +125,26 @@ async function parseError(res: Response): Promise<string> {
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
+  const res = await fetch(`${API_BASE}${path}`, {
+    cache: "no-store",
+    headers: accessHeaders(),
+  });
   if (!res.ok) throw new ApiError(await parseError(res), res.status);
   return res.json() as Promise<T>;
 }
 
 export async function apiDelete(path: string): Promise<void> {
-  const res = await fetch(`${API_BASE}${path}`, { method: "DELETE" });
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    headers: accessHeaders(),
+  });
   if (!res.ok) throw new ApiError(await parseError(res), res.status);
 }
 
 export async function apiPostJson<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: accessHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new ApiError(await parseError(res), res.status);
@@ -137,6 +158,12 @@ export function uploadMaterial(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${API_BASE}/api/materials/upload`);
+    const token =
+      process.env.NEXT_PUBLIC_AXIOM_ACCESS_TOKEN ||
+      (typeof window !== "undefined"
+        ? window.localStorage.getItem("axiom_access_token") || ""
+        : "");
+    if (token) xhr.setRequestHeader("X-Axiom-Token", token);
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable || !onProgress) return;
       onProgress(Math.round((event.loaded / event.total) * 100));
@@ -499,6 +526,12 @@ export function analyzeVisionImage(
     form.append("file", file);
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${API_BASE}/api/vision/analyze`);
+    const token =
+      process.env.NEXT_PUBLIC_AXIOM_ACCESS_TOKEN ||
+      (typeof window !== "undefined"
+        ? window.localStorage.getItem("axiom_access_token") || ""
+        : "");
+    if (token) xhr.setRequestHeader("X-Axiom-Token", token);
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable || !onProgress) return;
       onProgress(Math.round((event.loaded / event.total) * 100));
