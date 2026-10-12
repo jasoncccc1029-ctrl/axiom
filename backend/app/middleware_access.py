@@ -22,6 +22,10 @@ class AccessTokenMiddleware(BaseHTTPMiddleware):
         if not token:
             return await call_next(request)
 
+        # CORS preflight must pass without a token (middleware may sit outside CORS).
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         path = request.url.path
         if path == "/" or any(path == p or path.startswith(p + "/") for p in _OPEN_PREFIXES):
             return await call_next(request)

@@ -577,7 +577,15 @@ export default function TutorPage() {
                 <ErrorState message={practiceError} onRetry={() => void loadPractice()} />
               ) : null}
               {!practiceLoading && !previewProblem && practiceReco?.message ? (
-                <p className="text-sm text-ink-500">{practiceReco.message}</p>
+                <p className="text-sm text-ink-500">
+                  {practiceReco.message}{" "}
+                  <Link
+                    href="/"
+                    className="font-medium text-accent-700 hover:text-ink-950"
+                  >
+                    回總覽看推薦 →
+                  </Link>
+                </p>
               ) : null}
 
               {previewProblem && !practiceStarted ? (

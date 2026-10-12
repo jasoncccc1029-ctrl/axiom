@@ -120,6 +120,9 @@ async function parseError(res: Response): Promise<string> {
     if (typeof data?.detail === "string") return data.detail;
     return JSON.stringify(data?.detail ?? data);
   } catch {
+    if (res.status === 502 || res.status === 503 || res.status === 504) {
+      return "後端暫時連不上（請確認 API 已在 8000 埠執行）";
+    }
     return res.statusText || "Request failed";
   }
 }

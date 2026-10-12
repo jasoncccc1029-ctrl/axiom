@@ -21,7 +21,7 @@ from app.application.error_dna import ErrorDNAService
 from app.application.problem_repository import ProblemOut, ProblemRepository
 from app.application.student_learning_state import StudentLearningStateService
 from app.config import settings
-from app.models import Attempt, RecommendationRecord
+from app.models import Attempt, Problem, RecommendationRecord, TopicMastery
 
 
 # Map DifficultyPolicy levels (1–5) to Problem.difficulty float targets (0–1).
@@ -131,6 +131,23 @@ class AdaptiveQuestionEngine:
         resolved_concept = (
             concept or (rec.concept if rec else None) or state.current_concept
         )
+
+        # Common case: material supplies subject, state has concept but no topic yet.
+        if resolved_subject and not resolved_topic:
+            resolved_topic = self._infer_topic(
+                resolved_subject, concept=resolved_concept
+            )
+        # Subject-scoped recommendation missed (e.g. active rec is another subject):
+        # only fall back when the caller did not pin a subject.
+        if (not resolved_subject or not resolved_topic) and not subject:
+            fallback = self._active_recommendation(None)
+            if fallback:
+                resolved_subject = resolved_subject or fallback.subject
+                resolved_topic = resolved_topic or fallback.topic
+                if not resolved_concept:
+                    resolved_concept = fallback.concept
+                rec = fallback
+
         recommendation_used = bool(
             rec
             and (
@@ -141,7 +158,7 @@ class AdaptiveQuestionEngine:
 
         if not resolved_subject or not resolved_topic:
             return NextProblemResponse(
-                message="Not enough topic context to select a problem. Provide subject and topic."
+                message="尚無科目／主題焦點，請從總覽的推薦進入練習，或先選擇有主題的教材。"
             )
 
         dna = self.error_dna.profile(
@@ -238,6 +255,49 @@ class AdaptiveQuestionEngine:
         if subject:
             query = query.filter(RecommendationRecord.subject == subject)
         return query.order_by(RecommendationRecord.id.desc()).first()
+
+    def _infer_topic(self, subject: str, *, concept: str | None) -> str | None:
+        """Best-effort topic when only subject (and maybe concept) is known."""
+        if concept:
+            from_problem = (
+                self.db.query(Problem.topic)
+                .filter(
+                    Problem.subject == subject,
+                    Problem.concept == concept,
+                    Problem.topic.isnot(None),
+                    Problem.topic != "",
+                )
+                .order_by(Problem.id.asc())
+                .first()
+            )
+            if from_problem and from_problem[0]:
+                return str(from_problem[0])
+        weak = (
+            self.db.query(TopicMastery)
+            .filter(
+                TopicMastery.user_id == self.user_id,
+                TopicMastery.subject == subject,
+                TopicMastery.topic.isnot(None),
+                TopicMastery.topic != "",
+            )
+            .order_by(TopicMastery.mastery.asc(), TopicMastery.consecutive_errors.desc())
+            .first()
+        )
+        if weak and weak.topic:
+            return str(weak.topic)
+        any_problem = (
+            self.db.query(Problem.topic)
+            .filter(
+                Problem.subject == subject,
+                Problem.topic.isnot(None),
+                Problem.topic != "",
+            )
+            .order_by(Problem.id.asc())
+            .first()
+        )
+        if any_problem and any_problem[0]:
+            return str(any_problem[0])
+        return None
 
     def _load_candidates(
         self, subject: str, topic: str, concept: str | None

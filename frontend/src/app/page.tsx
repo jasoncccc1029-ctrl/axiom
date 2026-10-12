@@ -28,17 +28,34 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const [progress, recommendationData, studentData, memoryData] = await Promise.all([
+      const settled = await Promise.allSettled([
         apiGet<ProgressData>("/api/progress"),
         apiGet<RecommendationsResponse>("/api/recommendations"),
         apiGet<StudentModel>("/api/student"),
         apiGet<MemoryResponse>("/api/memory"),
       ]);
-      setData(progress);
-      setRecommendations(recommendationData);
-      setStudent(studentData);
-      setMemory(memoryData);
+      const [progressR, recommendationR, studentR, memoryR] = settled;
+      if (progressR.status === "rejected") {
+        throw progressR.reason instanceof Error
+          ? progressR.reason
+          : new Error("無法載入總覽資料（後端連線失敗）");
+      }
+      setData(progressR.value);
+      setRecommendations(
+        recommendationR.status === "fulfilled" ? recommendationR.value : null
+      );
+      setStudent(studentR.status === "fulfilled" ? studentR.value : null);
+      setMemory(memoryR.status === "fulfilled" ? memoryR.value : null);
+      if (
+        recommendationR.status === "rejected" ||
+        studentR.status === "rejected" ||
+        memoryR.status === "rejected"
+      ) {
+        // Progress is enough to render; keep a soft notice via console for partial failures.
+        console.warn("Dashboard partial load failure", settled);
+      }
     } catch (err) {
+      setData(null);
       setError(err instanceof Error ? err.message : "無法載入");
     } finally {
       setLoading(false);
