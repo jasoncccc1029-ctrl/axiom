@@ -578,7 +578,9 @@ export default function TutorPage() {
               ) : null}
               {!practiceLoading && !previewProblem && practiceReco?.message ? (
                 <p className="text-sm text-ink-500">
-                  {practiceReco.message}{" "}
+                  {practiceReco.message.includes("No problems available")
+                    ? "這個科目／主題還沒有題庫題目，仍可直接在下方對話練習。"
+                    : practiceReco.message}{" "}
                   <Link
                     href="/"
                     className="font-medium text-accent-700 hover:text-ink-950"

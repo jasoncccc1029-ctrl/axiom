@@ -96,8 +96,10 @@ async def test_agent_run_persists_trace_and_marks_partial_verification():
         assert result.trace_id
         assert result.provider == "fake"
         assert result.tool_calls[0].tool == "knowledge_search"
-        assert result.verification_status.value == "PARTIALLY_VERIFIED"
-        assert "未獲完整工具驗證" in result.final_answer
+        # Knowledge-only tools are not math verifiers → NOT_VERIFIABLE, no scary footer.
+        assert result.verification_status.value == "NOT_VERIFIABLE"
+        assert "驗證狀態" not in result.final_answer
+        assert "未獲完整工具驗證" not in result.final_answer
         stored = service.get_trace(result.trace_id)
         assert stored is not None
         assert stored.status == "completed"

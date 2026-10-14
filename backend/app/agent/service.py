@@ -250,13 +250,18 @@ class AgentService:
                 _mode_instruction(adapted_mode, request.confirmed_problem or request.message),
                 context=context,
             )
-            if verification in {
-                VerificationStatus.NOT_VERIFIABLE,
-                VerificationStatus.PARTIALLY_VERIFIED,
-            }:
+            # Only surface verification when tools were involved and result is weak/failed.
+            # Normal tutor chat (NOT_VERIFIABLE) should not append scary English status lines.
+            if verification == VerificationStatus.FAILED:
                 answer = (
-                    f"{answer}\n\n驗證狀態：{verification.value}。"
-                    "以上內容未獲完整工具驗證，請勿視為絕對確定。"
+                    f"{answer}\n\n（工具驗證未通過，以上內容請再自行核對。）"
+                )
+            elif (
+                verification == VerificationStatus.PARTIALLY_VERIFIED
+                and tool_results
+            ):
+                answer = (
+                    f"{answer}\n\n（此回覆有部分工具佐證，但尚未完全驗證。）"
                 )
             latency = round((time.perf_counter() - started) * 1000, 2)
             sources = _source_references(tool_results)

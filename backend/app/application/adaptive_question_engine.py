@@ -176,10 +176,7 @@ class AdaptiveQuestionEngine:
         )
         if not candidates:
             return NextProblemResponse(
-                message=(
-                    "No problems available in the problem bank for this subject/topic. "
-                    "Add problems to the bank, then try again."
-                )
+                message="這個科目／主題還沒有題庫題目，仍可直接在下方對話練習。"
             )
 
         recent = self._recent_problem_stats(

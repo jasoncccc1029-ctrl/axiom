@@ -206,7 +206,7 @@ def test_handles_no_candidate_problem():
         )
         assert result.problem is None
         assert result.message
-        assert "No problems" in result.message or "Not enough" in result.message
+        assert "題庫" in result.message or "尚無" in result.message
     finally:
         db.close()
 

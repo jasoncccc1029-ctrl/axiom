@@ -23,7 +23,8 @@ class Verifier:
             return VerificationStatus.VERIFIED
         if verification_tools:
             return VerificationStatus.PARTIALLY_VERIFIED
-        return VerificationStatus.PARTIALLY_VERIFIED
+        # Tools ran but none are math/calculator/python verifiers (e.g. knowledge only).
+        return VerificationStatus.NOT_VERIFIABLE
 
     def check_consistency(self, proposed_answer: str, tool_result: ToolResult) -> bool:
         if not tool_result.ok:

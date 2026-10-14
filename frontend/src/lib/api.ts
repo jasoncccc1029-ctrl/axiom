@@ -118,12 +118,20 @@ async function parseError(res: Response): Promise<string> {
   try {
     const data = await res.json();
     if (typeof data?.detail === "string") return data.detail;
-    return JSON.stringify(data?.detail ?? data);
+    if (data?.detail != null) return JSON.stringify(data.detail);
+    return `請求失敗（${res.status}）`;
   } catch {
+    if (res.status === 401) return "存取權杖無效或未設定，請重新整理後再試";
     if (res.status === 502 || res.status === 503 || res.status === 504) {
-      return "後端暫時連不上（請確認 API 已在 8000 埠執行）";
+      return "後端暫時連不上，請稍後再試";
     }
-    return res.statusText || "Request failed";
+    if (res.status === 413) return "內容太大，請縮短文字或換較小的圖片";
+    if (res.status >= 500) return `伺服器錯誤（${res.status}），請稍後重試`;
+    if (res.status === 0 || res.statusText === "Network Error") {
+      return "網路連線失敗，請檢查網路後重試";
+    }
+    // Avoid raw English "Request failed" in the UI.
+    return res.status ? `請求失敗（${res.status}）` : "請求失敗，請重試";
   }
 }
 
