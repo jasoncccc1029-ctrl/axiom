@@ -1,5 +1,6 @@
 """Database bootstrap and seed data."""
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -13,8 +14,23 @@ def init_db() -> None:
     db = SessionLocal()
     try:
         seed_default_user(db)
+        _sync_postgres_sequences(db)
     finally:
         db.close()
+
+
+def _sync_postgres_sequences(db: Session) -> None:
+    """After seeding fixed ids, advance Postgres sequences past MAX(id)."""
+    if engine.dialect.name != "postgresql":
+        return
+    for table in ("users", "student_profiles", "materials"):
+        db.execute(
+            text(
+                f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
+                f"COALESCE((SELECT MAX(id) FROM {table}), 1))"
+            )
+        )
+    db.commit()
 
 
 def seed_default_user(db: Session) -> None:

@@ -26,13 +26,20 @@ def get_or_create_guest_user(db: Session, guest_id: str) -> User:
     user = db.query(User).filter(User.email == email).one_or_none()
     if user is not None:
         return user
-    user = User(name="訪客", email=email)
-    db.add(user)
-    db.flush()
-    db.add(StudentProfile(user_id=user.id))
-    db.commit()
-    db.refresh(user)
-    return user
+    try:
+        user = User(name="訪客", email=email)
+        db.add(user)
+        db.flush()
+        db.add(StudentProfile(user_id=user.id))
+        db.commit()
+        db.refresh(user)
+        return user
+    except Exception:
+        db.rollback()
+        existing = db.query(User).filter(User.email == email).one_or_none()
+        if existing is not None:
+            return existing
+        raise
 
 
 def provide_user_id(
