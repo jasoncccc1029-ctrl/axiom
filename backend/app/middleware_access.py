@@ -30,10 +30,8 @@ class AccessTokenMiddleware(BaseHTTPMiddleware):
         if path == "/" or any(path == p or path.startswith(p + "/") for p in _OPEN_PREFIXES):
             return await call_next(request)
 
-        provided = request.headers.get("x-axiom-token") or ""
-        auth = request.headers.get("authorization") or ""
-        if auth.lower().startswith("bearer "):
-            provided = auth[7:].strip()
+        # X-Axiom-Token only — Authorization: Bearer is reserved for user session JWT.
+        provided = (request.headers.get("x-axiom-token") or "").strip()
 
         if provided != token:
             return JSONResponse(

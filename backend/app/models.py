@@ -1,8 +1,8 @@
 """ORM models for Axiom v1.0."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -18,6 +18,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     materials = relationship("Material", back_populates="user", cascade="all, delete-orphan")
@@ -33,6 +34,40 @@ class User(Base):
     profile = relationship(
         "StudentProfile", back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
+    ai_usage_daily = relationship(
+        "AiUsageDaily", back_populates="user", cascade="all, delete-orphan"
+    )
+    ai_usage_events = relationship(
+        "AiUsageEvent", back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class AiUsageDaily(Base):
+    """Per-user UTC daily AI request counter for quota enforcement."""
+
+    __tablename__ = "ai_usage_daily"
+    __table_args__ = (UniqueConstraint("user_id", "day", name="uq_ai_usage_daily_user_day"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    day: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    request_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    user = relationship("User", back_populates="ai_usage_daily")
+
+
+class AiUsageEvent(Base):
+    """Append-only AI call log for light analytics."""
+
+    __tablename__ = "ai_usage_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    purpose: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+    user = relationship("User", back_populates="ai_usage_events")
 
 
 class Material(Base):

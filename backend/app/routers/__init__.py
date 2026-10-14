@@ -3,6 +3,22 @@
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from app.ai_quota import (
+    AiUsageStatus,
+    get_usage_status,
+    make_ai_quota_dep,
+    record_ai_usage,
+)
+from app.auth import (
+    AuthResponse,
+    AuthUserOut,
+    LoginRequest,
+    RegisterRequest,
+    authenticate_user,
+    register_user,
+    require_auth_user,
+    to_auth_response,
+)
 from app.config import settings
 from app.guest import provide_user_id
 from app.agent.schemas import AgentRunRequest, AgentRunResponse, AgentTraceResponse
@@ -76,7 +92,7 @@ from app.dependencies import (
 )
 from app.core.errors import AxiomError
 from app.knowledge.ingestion import DocumentIngestionService
-from app.models import AgentTrace, LearningRecord, Material, Question
+from app.models import AgentTrace, LearningRecord, Material, Question, User
 from app.providers import ModelProvider, ProviderError
 from app.providers.health import check_text_brain_health
 from app.schemas import (
@@ -111,6 +127,31 @@ router = APIRouter()
 @router.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse(status="ok", app=settings.app_name, version=settings.app_version)
+
+
+@router.post("/api/auth/register", response_model=AuthResponse)
+def api_auth_register(body: RegisterRequest, db: Session = Depends(get_db)) -> AuthResponse:
+    user = register_user(db, body)
+    return to_auth_response(user)
+
+
+@router.post("/api/auth/login", response_model=AuthResponse)
+def api_auth_login(body: LoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
+    user = authenticate_user(db, body)
+    return to_auth_response(user)
+
+
+@router.get("/api/auth/me", response_model=AuthUserOut)
+def api_auth_me(user: User = Depends(require_auth_user)) -> AuthUserOut:
+    return AuthUserOut(id=user.id, name=user.name, email=user.email)
+
+
+@router.get("/api/ai/usage", response_model=AiUsageStatus)
+def api_ai_usage(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(provide_user_id),
+) -> AiUsageStatus:
+    return get_usage_status(db, user_id)
 
 
 @router.get("/api/system/health", response_model=SystemHealthResponse)
@@ -178,6 +219,8 @@ async def api_ollama_health() -> OllamaHealthResponse:
 async def api_vision_analyze(
     file: UploadFile = File(...),
     service: VisionService = Depends(provide_vision_service),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(provide_user_id),
 ) -> VisionAnalyzeResponse:
     content = await file.read()
     started = time.perf_counter()
@@ -201,6 +244,12 @@ async def api_vision_analyze(
                 status_code=500,
                 detail="Vision provider misconfigured: unexpected mock response.",
             )
+    elif settings.vision_provider != "mock":
+        # Real vision costs quota only after a successful analysis.
+        from app.ai_quota import ensure_ai_quota
+
+        ensure_ai_quota(db, user_id)
+        record_ai_usage(db, user_id, "vision")
 
     return VisionAnalyzeResponse(
         analysis=VisionAnalysisOut(
@@ -260,14 +309,18 @@ async def api_vision_health() -> VisionHealthResponse:
 async def api_agent_run(
     payload: AgentRunRequest,
     service: AgentService = Depends(provide_agent_service),
+    quota: tuple[Session, int, str] = Depends(make_ai_quota_dep("tutor")),
 ) -> AgentRunResponse:
+    db, user_id, purpose = quota
     try:
-        return await service.run(payload)
+        result = await service.run(payload)
     except (ProviderError, AxiomError) as exc:
         raise HTTPException(
             status_code=getattr(exc, "status_code", 503),
             detail=getattr(exc, "message", str(exc)),
         ) from exc
+    record_ai_usage(db, user_id, purpose)
+    return result
 
 
 @router.get("/api/agent/{trace_id}", response_model=AgentTraceResponse)
@@ -446,11 +499,15 @@ def api_evaluation_report(
 async def api_problems_solve(
     payload: ProblemSolveRequest,
     service: ProblemSolverService = Depends(provide_problem_solver),
+    quota: tuple[Session, int, str] = Depends(make_ai_quota_dep("solve")),
 ) -> ProblemSolveResponse:
+    db, user_id, purpose = quota
     try:
-        return await service.solve(payload)
+        result = await service.solve(payload)
     except ProviderError as exc:
         raise HTTPException(status_code=503, detail=exc.message) from exc
+    record_ai_usage(db, user_id, purpose)
+    return result
 
 
 @router.post("/api/learning/record", response_model=LearningRecordResponse)
@@ -645,7 +702,9 @@ async def api_chat(
     db: Session = Depends(get_db),
     provider: ModelProvider = Depends(provide_model_provider),
     user_id: int = Depends(provide_user_id),
+    quota: tuple[Session, int, str] = Depends(make_ai_quota_dep("chat")),
 ) -> ChatResponse:
+    _db, _uid, purpose = quota
     context = None
     if payload.material_id is not None:
         material = db.get(Material, payload.material_id)
@@ -667,6 +726,7 @@ async def api_chat(
         )
     )
     db.commit()
+    record_ai_usage(db, user_id, purpose)
 
     return ChatResponse(
         reply=reply,
@@ -682,7 +742,9 @@ async def api_solve(
     db: Session = Depends(get_db),
     provider: ModelProvider = Depends(provide_model_provider),
     user_id: int = Depends(provide_user_id),
+    quota: tuple[Session, int, str] = Depends(make_ai_quota_dep("solve")),
 ) -> SolveResponse:
+    _db, _uid, purpose = quota
     try:
         result = await provider.solve(payload.problem, subject=payload.subject)
     except ProviderError as exc:
@@ -712,6 +774,7 @@ async def api_solve(
         )
     )
     db.commit()
+    record_ai_usage(db, user_id, purpose)
 
     steps = [SolveStep(**step) for step in result.get("steps", [])]
     model_name = str(result.get("model") or provider.model)

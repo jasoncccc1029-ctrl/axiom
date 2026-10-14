@@ -18,9 +18,14 @@ MIGRATION_IDS = (
     "004_intelligent_adaptive_learning",
     "005_learning_efficacy_pilot",
     "006_problem_repository",
+    "007_user_auth",
+    "008_ai_usage_quota",
 )
 
 ALTER_COLUMNS: dict[str, dict[str, str]] = {
+    "users": {
+        "password_hash": "VARCHAR(255)",
+    },
     "materials": {
         "mime_type": "VARCHAR(120)",
         "size_bytes": "INTEGER NOT NULL DEFAULT 0",

@@ -44,7 +44,16 @@ class Settings(BaseSettings):
     # Optional shared secret for early cloud demo (empty = disabled, local-friendly)
     access_token: str = ""
 
-    # Local single-user mode (Phase-1: one logical student until real auth)
+    # Signed session tokens for email/password login (set AUTH_SECRET in production)
+    auth_secret: str = "axiom-dev-auth-secret-change-me"
+    auth_token_ttl_hours: int = 720  # 30 days
+
+    # AI quota (UTC day). Protects shared Gemini/OpenAI key from abuse.
+    ai_quota_enabled: bool = True
+    ai_daily_limit_guest: int = 3
+    ai_daily_limit_user: int = 40
+
+    # Local single-user mode when neither auth nor guest header is present
     default_user_id: int = 1
     default_user_name: str = "Student"
     default_user_email: str = "student@axiom.local"

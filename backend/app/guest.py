@@ -7,6 +7,7 @@ import re
 from fastapi import Depends, Header, Request
 from sqlalchemy.orm import Session
 
+from app.auth import user_from_authorization
 from app.config import settings
 from app.database import get_db
 from app.models import StudentProfile, User
@@ -46,8 +47,15 @@ def provide_user_id(
     request: Request,
     db: Session = Depends(get_db),
     x_axiom_guest: str | None = Header(default=None, alias="X-Axiom-Guest"),
+    authorization: str | None = Header(default=None),
 ) -> int:
-    """Resolve learner: guest UUID header → dedicated user; else default demo user."""
+    """Resolve learner: auth Bearer → guest UUID → default demo user."""
+    auth_user = user_from_authorization(
+        db, authorization or request.headers.get("authorization")
+    )
+    if auth_user is not None:
+        return auth_user.id
+
     raw = (x_axiom_guest or request.headers.get("x-axiom-guest") or "").strip()
     if raw and _GUEST_RE.match(raw):
         return get_or_create_guest_user(db, raw).id

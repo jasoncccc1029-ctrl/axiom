@@ -47,3 +47,8 @@ class ValidationError(AxiomError):
 class NotFoundError(AxiomError):
     status_code = 404
     code = "not_found"
+
+
+class QuotaExceededError(AxiomError):
+    status_code = 429
+    code = "ai_quota_exceeded"

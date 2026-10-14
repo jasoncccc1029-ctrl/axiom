@@ -7,6 +7,8 @@ import {
   Brain,
   ClipboardCheck,
   LayoutDashboard,
+  LogIn,
+  LogOut,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
@@ -17,6 +19,7 @@ import {
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { AxiomMark } from "@/components/brand/AxiomMark";
+import { useAuth } from "@/lib/auth";
 
 const STORAGE_KEY = "axiom-sidebar-collapsed";
 
@@ -31,6 +34,7 @@ const nav = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [ready, setReady] = useState(false);
@@ -123,22 +127,51 @@ export function Sidebar() {
           {navLinks({ compact: collapsed })}
         </nav>
 
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          className={cn(
-            "mt-4 flex items-center rounded-xl border border-ink-100 bg-white/70 text-ink-600 transition hover:bg-white hover:text-ink-950",
-            collapsed ? "justify-center px-0 py-2.5" : "gap-2 px-3 py-2 text-xs"
-          )}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={collapsed ? "展開側欄" : "收合側欄"}
-        >
-          {collapsed ? (
-            <PanelLeftOpen className="h-4 w-4" />
+        <div className={cn("mt-4 flex flex-col gap-2", collapsed && "items-stretch")}>
+          {user ? (
+            <button
+              type="button"
+              onClick={() => logout()}
+              title="登出"
+              className={cn(
+                "flex items-center rounded-xl border border-ink-100 bg-white/70 text-sm text-ink-600 transition hover:bg-white hover:text-ink-950",
+                collapsed ? "justify-center px-0 py-2.5" : "gap-2 px-3 py-2"
+              )}
+            >
+              <LogOut className="h-4 w-4 shrink-0" />
+              {!collapsed ? <span className="truncate">登出 · {user.name}</span> : null}
+            </button>
           ) : (
-            <PanelLeftClose className="h-4 w-4" />
+            <Link
+              href="/login"
+              title="登入"
+              className={cn(
+                "flex items-center rounded-xl border border-ink-100 bg-white/70 text-sm text-ink-600 transition hover:bg-white hover:text-ink-950",
+                collapsed ? "justify-center px-0 py-2.5" : "gap-2 px-3 py-2",
+                pathname === "/login" && "border-ink-200 bg-white text-ink-950"
+              )}
+            >
+              <LogIn className="h-4 w-4 shrink-0" />
+              {!collapsed ? <span>登入／註冊</span> : null}
+            </Link>
           )}
-        </button>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            className={cn(
+              "flex items-center rounded-xl border border-ink-100 bg-white/70 text-ink-600 transition hover:bg-white hover:text-ink-950",
+              collapsed ? "justify-center px-0 py-2.5" : "gap-2 px-3 py-2 text-xs"
+            )}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? "展開側欄" : "收合側欄"}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </button>
+        </div>
       </aside>
 
       {mobileOpen ? (
@@ -175,6 +208,30 @@ export function Sidebar() {
             <nav className="flex flex-1 flex-col gap-1">
               {navLinks({ onNavigate: () => setMobileOpen(false) })}
             </nav>
+            <div className="mt-4 border-t border-ink-100 pt-4">
+              {user ? (
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink-600 hover:bg-white/70"
+                  onClick={() => {
+                    logout();
+                    setMobileOpen(false);
+                  }}
+                >
+                  <LogOut className="h-4 w-4" />
+                  登出 · {user.name}
+                </button>
+              ) : (
+                <Link
+                  href="/login"
+                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink-600 hover:bg-white/70"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <LogIn className="h-4 w-4" />
+                  登入／註冊
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       ) : null}

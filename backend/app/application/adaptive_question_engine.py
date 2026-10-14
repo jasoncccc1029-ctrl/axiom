@@ -277,7 +277,10 @@ class AdaptiveQuestionEngine:
                 TopicMastery.topic.isnot(None),
                 TopicMastery.topic != "",
             )
-            .order_by(TopicMastery.mastery.asc(), TopicMastery.consecutive_errors.desc())
+            .order_by(
+                TopicMastery.mastery_estimate.asc(),
+                TopicMastery.consecutive_errors.desc(),
+            )
             .first()
         )
         if weak and weak.topic:

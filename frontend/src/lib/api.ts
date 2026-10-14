@@ -5,6 +5,20 @@
  */
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
+export const AUTH_TOKEN_KEY = "axiom_auth_token";
+
+export type AuthUser = {
+  id: number;
+  name: string;
+  email: string;
+};
+
+export type AuthResponse = {
+  access_token: string;
+  token_type: string;
+  user: AuthUser;
+};
+
 function guestId(): string {
   if (typeof window === "undefined") return "";
   const key = "axiom_guest_id";
@@ -20,17 +34,83 @@ function guestId(): string {
   return id;
 }
 
+export function getAuthToken(): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(AUTH_TOKEN_KEY) || "";
+}
+
+export function setAuthToken(token: string | null): void {
+  if (typeof window === "undefined") return;
+  if (token) window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+  else window.localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
 function accessHeaders(extra?: HeadersInit): HeadersInit {
-  const token =
+  const gate =
     process.env.NEXT_PUBLIC_AXIOM_ACCESS_TOKEN ||
     (typeof window !== "undefined"
       ? window.localStorage.getItem("axiom_access_token") || ""
       : "");
   const headers = new Headers(extra);
-  if (token) headers.set("X-Axiom-Token", token);
-  const guest = guestId();
-  if (guest) headers.set("X-Axiom-Guest", guest);
+  if (gate) headers.set("X-Axiom-Token", gate);
+  const session = getAuthToken();
+  if (session) {
+    headers.set("Authorization", `Bearer ${session}`);
+  } else {
+    const guest = guestId();
+    if (guest) headers.set("X-Axiom-Guest", guest);
+  }
   return headers;
+}
+
+function applyAuthToXhr(xhr: XMLHttpRequest): void {
+  const gate =
+    process.env.NEXT_PUBLIC_AXIOM_ACCESS_TOKEN ||
+    (typeof window !== "undefined"
+      ? window.localStorage.getItem("axiom_access_token") || ""
+      : "");
+  if (gate) xhr.setRequestHeader("X-Axiom-Token", gate);
+  const session = getAuthToken();
+  if (session) {
+    xhr.setRequestHeader("Authorization", `Bearer ${session}`);
+  } else {
+    const guest = guestId();
+    if (guest) xhr.setRequestHeader("X-Axiom-Guest", guest);
+  }
+}
+
+export async function authRegister(input: {
+  name: string;
+  email: string;
+  password: string;
+}): Promise<AuthResponse> {
+  return apiPostJson<AuthResponse>("/api/auth/register", input);
+}
+
+export async function authLogin(input: {
+  email: string;
+  password: string;
+}): Promise<AuthResponse> {
+  return apiPostJson<AuthResponse>("/api/auth/login", input);
+}
+
+export async function authMe(): Promise<AuthUser> {
+  return apiGet<AuthUser>("/api/auth/me");
+}
+
+export type AiUsageStatus = {
+  enabled: boolean;
+  user_id: number;
+  is_guest: boolean;
+  day: string;
+  used: number;
+  limit: number;
+  remaining: number;
+  resets_at: string;
+};
+
+export async function getAiUsage(): Promise<AiUsageStatus> {
+  return apiGet<AiUsageStatus>("/api/ai/usage");
 }
 
 
@@ -131,16 +211,37 @@ export class ApiError extends Error {
   }
 }
 
+function friendlyAiBusyMessage(detail: string): string | null {
+  const lower = detail.toLowerCase();
+  if (
+    lower.includes("high demand") ||
+    lower.includes("unavailable") ||
+    detail.includes("忙碌") ||
+    detail.includes("暫時無法回應") ||
+    /gemini 請求失敗（50[234]）/i.test(detail)
+  ) {
+    return "AI 目前忙碌，請稍後再試（這次不會扣今日額度）。";
+  }
+  return null;
+}
+
 async function parseError(res: Response): Promise<string> {
   try {
     const data = await res.json();
-    if (typeof data?.detail === "string") return data.detail;
+    if (typeof data?.detail === "string") {
+      return friendlyAiBusyMessage(data.detail) ?? data.detail;
+    }
+    if (Array.isArray(data?.detail) && data.detail.length > 0) {
+      const first = data.detail[0];
+      if (typeof first?.msg === "string") return first.msg;
+    }
     if (data?.detail != null) return JSON.stringify(data.detail);
     return `請求失敗（${res.status}）`;
   } catch {
-    if (res.status === 401) return "存取權杖無效或未設定，請重新整理後再試";
-    if (res.status === 502 || res.status === 503 || res.status === 504) {
-      return "後端暫時連不上，請稍後再試";
+    if (res.status === 401) return "請先登入，或檢查存取權杖";
+    if (res.status === 429) return "今日 AI 額度已用完，請明天再來或先登入取得更多次數";
+    if (res.status === 502 || res.status === 503 || res.status === 504 || res.status === 505) {
+      return "AI 或伺服器暫時忙碌，請稍後再試";
     }
     if (res.status === 413) return "內容太大，請縮短文字或換較小的圖片";
     if (res.status >= 500) return `伺服器錯誤（${res.status}），請稍後重試`;
@@ -186,14 +287,7 @@ export function uploadMaterial(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${API_BASE}/api/materials/upload`);
-    const token =
-      process.env.NEXT_PUBLIC_AXIOM_ACCESS_TOKEN ||
-      (typeof window !== "undefined"
-        ? window.localStorage.getItem("axiom_access_token") || ""
-        : "");
-    if (token) xhr.setRequestHeader("X-Axiom-Token", token);
-    const guest = guestId();
-    if (guest) xhr.setRequestHeader("X-Axiom-Guest", guest);
+    applyAuthToXhr(xhr);
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable || !onProgress) return;
       onProgress(Math.round((event.loaded / event.total) * 100));
@@ -556,14 +650,7 @@ export function analyzeVisionImage(
     form.append("file", file);
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${API_BASE}/api/vision/analyze`);
-    const token =
-      process.env.NEXT_PUBLIC_AXIOM_ACCESS_TOKEN ||
-      (typeof window !== "undefined"
-        ? window.localStorage.getItem("axiom_access_token") || ""
-        : "");
-    if (token) xhr.setRequestHeader("X-Axiom-Token", token);
-    const guest = guestId();
-    if (guest) xhr.setRequestHeader("X-Axiom-Guest", guest);
+    applyAuthToXhr(xhr);
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable || !onProgress) return;
       onProgress(Math.round((event.loaded / event.total) * 100));

@@ -308,9 +308,22 @@ class GeminiProvider(ModelProvider):
                 provider=ProviderId.GEMINI.value,
             )
 
+        if response.status_code in {502, 503, 504}:
+            raise ProviderRequestError(
+                "AI 目前忙碌或暫時無法回應，請稍後再試。",
+                code="gemini_unavailable",
+                provider=ProviderId.GEMINI.value,
+            )
+
         if response.status_code >= 400:
             detail = (response.text or "")[:300]
             lower = detail.lower()
+            if "high demand" in lower or "unavailable" in lower:
+                raise ProviderRequestError(
+                    "AI 目前忙碌或暫時無法回應，請稍後再試。",
+                    code="gemini_unavailable",
+                    provider=ProviderId.GEMINI.value,
+                )
             if "model" in lower and (
                 "not found" in lower or "not supported" in lower or "invalid" in lower
             ):
@@ -321,7 +334,7 @@ class GeminiProvider(ModelProvider):
                     code="gemini_model_missing",
                 )
             raise ProviderRequestError(
-                f"Gemini 請求失敗（{response.status_code}）：{detail}",
+                f"Gemini 請求失敗（{response.status_code}），請稍後再試。",
                 code="gemini_request_error",
                 provider=ProviderId.GEMINI.value,
             )
