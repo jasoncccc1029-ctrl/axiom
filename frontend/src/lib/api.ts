@@ -5,6 +5,21 @@
  */
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
+function guestId(): string {
+  if (typeof window === "undefined") return "";
+  const key = "axiom_guest_id";
+  let id = window.localStorage.getItem(key) || "";
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      id
+    )
+  ) {
+    id = crypto.randomUUID();
+    window.localStorage.setItem(key, id);
+  }
+  return id;
+}
+
 function accessHeaders(extra?: HeadersInit): HeadersInit {
   const token =
     process.env.NEXT_PUBLIC_AXIOM_ACCESS_TOKEN ||
@@ -13,6 +28,8 @@ function accessHeaders(extra?: HeadersInit): HeadersInit {
       : "");
   const headers = new Headers(extra);
   if (token) headers.set("X-Axiom-Token", token);
+  const guest = guestId();
+  if (guest) headers.set("X-Axiom-Guest", guest);
   return headers;
 }
 
@@ -175,6 +192,8 @@ export function uploadMaterial(
         ? window.localStorage.getItem("axiom_access_token") || ""
         : "");
     if (token) xhr.setRequestHeader("X-Axiom-Token", token);
+    const guest = guestId();
+    if (guest) xhr.setRequestHeader("X-Axiom-Guest", guest);
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable || !onProgress) return;
       onProgress(Math.round((event.loaded / event.total) * 100));
@@ -543,6 +562,8 @@ export function analyzeVisionImage(
         ? window.localStorage.getItem("axiom_access_token") || ""
         : "");
     if (token) xhr.setRequestHeader("X-Axiom-Token", token);
+    const guest = guestId();
+    if (guest) xhr.setRequestHeader("X-Axiom-Guest", guest);
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable || !onProgress) return;
       onProgress(Math.round((event.loaded / event.total) * 100));

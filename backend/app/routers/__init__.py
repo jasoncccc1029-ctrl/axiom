@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.guest import provide_user_id
 from app.agent.schemas import AgentRunRequest, AgentRunResponse, AgentTraceResponse
 from app.agent.service import AgentService
 from app.application.problem_solver import (
@@ -576,17 +577,25 @@ def api_problem_bank_update(
 
 
 @router.get("/api/materials", response_model=list[MaterialOut])
-def api_list_materials(db: Session = Depends(get_db)) -> list[Material]:
-    return material_service.list_materials(db)
+def api_list_materials(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(provide_user_id),
+) -> list[Material]:
+    return material_service.list_materials(db, user_id=user_id)
 
 
 @router.post("/api/materials", response_model=MaterialOut)
-async def api_create_material(payload: MaterialCreate, db: Session = Depends(get_db)) -> Material:
+async def api_create_material(
+    payload: MaterialCreate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(provide_user_id),
+) -> Material:
     material = material_service.create_note_material(
         db,
         title=payload.title,
         subject=payload.subject,
         description=payload.description,
+        user_id=user_id,
     )
     ingestion = DocumentIngestionService(db)
     await ingestion.ingest_text(
@@ -606,6 +615,7 @@ async def api_upload_material(
     description: str | None = Form(None),
     db: Session = Depends(get_db),
     vision_provider: VisionProvider = Depends(provide_vision_provider),
+    user_id: int = Depends(provide_user_id),
 ) -> Material:
     ingestion = DocumentIngestionService(db, vision_provider=vision_provider)
     return await material_service.save_upload(
@@ -615,12 +625,17 @@ async def api_upload_material(
         subject=subject,
         description=description,
         ingestion_service=ingestion,
+        user_id=user_id,
     )
 
 
 @router.delete("/api/materials/{material_id}")
-def api_delete_material(material_id: int, db: Session = Depends(get_db)) -> dict[str, str]:
-    material_service.delete_material(db, material_id)
+def api_delete_material(
+    material_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(provide_user_id),
+) -> dict[str, str]:
+    material_service.delete_material(db, material_id, user_id=user_id)
     return {"status": "deleted"}
 
 
@@ -629,6 +644,7 @@ async def api_chat(
     payload: ChatRequest,
     db: Session = Depends(get_db),
     provider: ModelProvider = Depends(provide_model_provider),
+    user_id: int = Depends(provide_user_id),
 ) -> ChatResponse:
     context = None
     if payload.material_id is not None:
@@ -643,7 +659,7 @@ async def api_chat(
 
     db.add(
         LearningRecord(
-            user_id=settings.default_user_id,
+            user_id=user_id,
             activity_type="chat",
             subject=(context.split("/")[1].split(":")[0].strip() if context else None),
             duration_minutes=2,
@@ -665,6 +681,7 @@ async def api_solve(
     payload: SolveRequest,
     db: Session = Depends(get_db),
     provider: ModelProvider = Depends(provide_model_provider),
+    user_id: int = Depends(provide_user_id),
 ) -> SolveResponse:
     try:
         result = await provider.solve(payload.problem, subject=payload.subject)
@@ -675,7 +692,7 @@ async def api_solve(
     is_correct = verification.get("status") == "correct"
 
     question = Question(
-        user_id=settings.default_user_id,
+        user_id=user_id,
         material_id=payload.material_id,
         content=payload.problem,
         subject=payload.subject,
@@ -685,7 +702,7 @@ async def api_solve(
     db.add(question)
     db.add(
         LearningRecord(
-            user_id=settings.default_user_id,
+            user_id=user_id,
             activity_type="solve",
             subject=payload.subject,
             duration_minutes=5,

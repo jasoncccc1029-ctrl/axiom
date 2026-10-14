@@ -53,18 +53,20 @@ class AgentService:
         student_model: StudentModelService | None = None,
         learning_loop: LearningLoopService | None = None,
         learning_state: StudentLearningStateService | None = None,
+        user_id: int | None = None,
     ) -> None:
         self.db = db
+        self.user_id = user_id or settings.default_user_id
         self.model_provider = model_provider
         self.tool_router = tool_router
         self.orchestrator = orchestrator or AgentOrchestrator()
         self.planner = planner or Planner(settings.max_agent_steps, self.orchestrator)
         self.context_builder = context_builder or ContextBuilder()
         self.verifier = verifier or Verifier()
-        self.adaptive_tutor = adaptive_tutor or AdaptiveTutor(db)
-        self.student_model = student_model or StudentModelService(db)
-        self.learning_loop = learning_loop or LearningLoopService(db)
-        self.learning_state = learning_state or StudentLearningStateService(db)
+        self.adaptive_tutor = adaptive_tutor or AdaptiveTutor(db, self.user_id)
+        self.student_model = student_model or StudentModelService(db, self.user_id)
+        self.learning_loop = learning_loop or LearningLoopService(db, self.user_id)
+        self.learning_state = learning_state or StudentLearningStateService(db, self.user_id)
 
     async def run(self, request: AgentRunRequest) -> AgentRunResponse:
         started = time.perf_counter()
@@ -95,9 +97,9 @@ class AgentService:
             if request.conversation_id is not None
             else None
         )
-        if conversation is None or conversation.user_id != settings.default_user_id:
+        if conversation is None or conversation.user_id != self.user_id:
             conversation = Conversation(
-                user_id=settings.default_user_id,
+                user_id=self.user_id,
                 title=(request.confirmed_problem or request.message)[:120],
             )
             self.db.add(conversation)
@@ -118,7 +120,7 @@ class AgentService:
         effective_request = request.model_copy(update={"mode": adapted_mode})
 
         question = Question(
-            user_id=settings.default_user_id,
+            user_id=self.user_id,
             material_id=request.material_id,
             content=request.confirmed_problem or request.message,
             subject=request.subject,
@@ -137,7 +139,7 @@ class AgentService:
         )
         trace = AgentTrace(
             trace_id=trace_id,
-            user_id=settings.default_user_id,
+            user_id=self.user_id,
             status="running",
             input_type=request.input_type,
             mode=adapted_mode.value,

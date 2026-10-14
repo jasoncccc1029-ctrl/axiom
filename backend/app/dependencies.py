@@ -19,6 +19,7 @@ from app.application.adaptive_question_engine import AdaptiveQuestionEngine
 from app.application.student_model import StudentModelService
 from app.config import settings
 from app.database import get_db
+from app.guest import provide_user_id
 from app.knowledge.embedding import LocalHashEmbeddingProvider
 from app.knowledge.retriever import KnowledgeRetriever
 from app.knowledge.vector_store import SQLiteVectorStore
@@ -67,6 +68,7 @@ def provide_vision_service(request: Request) -> VisionService:
 def provide_agent_service(
     request: Request,
     db: Session = Depends(get_db),
+    user_id: int = Depends(provide_user_id),
 ) -> AgentService:
     container = get_container(request)
     store = SQLiteVectorStore(db)
@@ -74,54 +76,86 @@ def provide_agent_service(
     tools = ToolRouter(
         [KnowledgeSearchTool(retriever), CalculatorTool(), MathTool(), PythonTool()]
     )
-    return AgentService(db, container.model_provider, tools)
+    return AgentService(
+        db,
+        container.model_provider,
+        tools,
+        user_id=user_id,
+        adaptive_tutor=AdaptiveTutor(db, user_id),
+        student_model=StudentModelService(db, user_id),
+        learning_loop=LearningLoopService(db, user_id),
+        learning_state=StudentLearningStateService(db, user_id),
+    )
 
 
 def provide_problem_solver(
     request: Request,
     db: Session = Depends(get_db),
+    user_id: int = Depends(provide_user_id),
 ) -> ProblemSolverService:
     return ProblemSolverService(
         get_container(request).model_provider,
         db=db,
+        learning_state=StudentLearningStateService(db, user_id),
+        student_model=StudentModelService(db, user_id),
     )
 
 
-def provide_memory_service(db: Session = Depends(get_db)) -> MemoryService:
-    return MemoryService(db)
+def provide_memory_service(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(provide_user_id),
+) -> MemoryService:
+    return MemoryService(db, user_id)
 
 
-def provide_adaptive_tutor(db: Session = Depends(get_db)) -> AdaptiveTutor:
-    return AdaptiveTutor(db)
+def provide_adaptive_tutor(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(provide_user_id),
+) -> AdaptiveTutor:
+    return AdaptiveTutor(db, user_id)
 
 
-def provide_student_model(db: Session = Depends(get_db)) -> StudentModelService:
-    return StudentModelService(db)
+def provide_student_model(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(provide_user_id),
+) -> StudentModelService:
+    return StudentModelService(db, user_id)
 
 
-def provide_learning_loop(db: Session = Depends(get_db)) -> LearningLoopService:
-    return LearningLoopService(db)
+def provide_learning_loop(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(provide_user_id),
+) -> LearningLoopService:
+    return LearningLoopService(db, user_id)
 
 
-def provide_evaluation_service(db: Session = Depends(get_db)) -> EvaluationService:
-    return EvaluationService(db)
+def provide_evaluation_service(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(provide_user_id),
+) -> EvaluationService:
+    return EvaluationService(db, user_id)
 
 
 def provide_problem_repository(db: Session = Depends(get_db)) -> ProblemRepository:
     return ProblemRepository(db)
 
 
-def provide_error_dna(db: Session = Depends(get_db)) -> ErrorDNAService:
-    return ErrorDNAService(db)
+def provide_error_dna(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(provide_user_id),
+) -> ErrorDNAService:
+    return ErrorDNAService(db, user_id)
 
 
 def provide_student_learning_state(
     db: Session = Depends(get_db),
+    user_id: int = Depends(provide_user_id),
 ) -> StudentLearningStateService:
-    return StudentLearningStateService(db)
+    return StudentLearningStateService(db, user_id)
 
 
 def provide_adaptive_question_engine(
     db: Session = Depends(get_db),
+    user_id: int = Depends(provide_user_id),
 ) -> AdaptiveQuestionEngine:
-    return AdaptiveQuestionEngine(db)
+    return AdaptiveQuestionEngine(db, user_id)
