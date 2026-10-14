@@ -1,6 +1,3 @@
-# Build from repo root: docker build -f backend/Dockerfile .
-# Or set Railway root directory to `backend` and use the alternate COPY paths below.
-
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -13,11 +10,11 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Prefer monorepo root context (Railway default when dockerfilePath=backend/Dockerfile)
-COPY backend/requirements.txt ./requirements.txt
-COPY backend/app ./app
+COPY requirements.runtime.txt ./requirements.txt
+COPY app ./app
 
-RUN pip install -r requirements.txt
+RUN pip install --upgrade pip \
+    && pip install -r requirements.txt
 
 ENV PORT=8000
 EXPOSE 8000
